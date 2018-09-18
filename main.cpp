@@ -1,4 +1,3 @@
-#include "token.hpp"
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/action.hpp>
 #include <eosiolib/currency.hpp>
@@ -8,16 +7,22 @@
 #include <list>
 #include <ctime>
 
+#include "token.hpp"
+#include "app_dispatcher.hpp"
+
 using namespace eosio;
-using std::string;
-using std::vector;
-using std::list;
 
 #define ID_NOT_DEFINED 0
 
 namespace golos {
+  using std::string;
+  using std::vector;
+  using std::list;
+
   class workers: public contract {
     public:
+      typedef symbol_name app_domain_t;
+      
       typedef uint64_t comment_id_t;   
       struct comment_t {
         comment_id_t id;
@@ -57,14 +62,28 @@ namespace golos {
 
       //@abi table records i64
       EOSLIB_SERIALIZE(proposal_t, (id)(owner)(title)(description)(upvotes)(downvotes)(comments)(created)(modified));
-
       typedef multi_index<N(proposals), proposal_t> proposals_t;
+      proposals_t _proposals;
+
+      struct prop_t {
+        symbol_name token_symbol;
+        asset total_locked;
+        uint64_t primary_key() const { return 0; }
+      };
+
+      EOSLIB_SERIALIZE(prop_t, (token_symbol)(total_locked));
+      typedef multi_index<N(settings), prop_t> props_t;
+      props_t _props;
+      app_domain_t _app;
+
     public:
-        workers(account_name owner): 
-          contract(owner) {}
+        workers(account_name owner, app_domain_t app): 
+          contract(owner), _app(app), _props(_self, app), _proposals(_self, app) {}
+
 
         /// @abi action
         void add_proposal(account_name owner, string content) {
+          
           // auto key = _proposals::primary_key(document_hash);
           // // require_auth(owner);
           // records.emplace(owner, [&] (auto& r) {
@@ -138,16 +157,23 @@ namespace golos {
 
         }
 
-        asset get_balance(scope_name app_name) {
-          symbol_name symbol = app_name;
+        symbol_name get_token_symbol() {
+          return _props.get(0).token_symbol;
+        }
+
+        asset get_balance() {
           accounts acc(N(golos.token), _self);
-          auto balanceIt = acc.find(symbol);
+          auto balanceIt = acc.find(get_token_symbol());
           eosio_assert(balanceIt != acc.end(), "token symbol does not exists");
           return balanceIt->balance;
         }
 
         asset get_locked() {
-
+          accounts acc(N(golos.token), _self);
+          auto balanceIt = acc.find(get_token_symbol());
+          eosio_assert(balanceIt != acc.end(), "token symbol does not exists");
+          auto locked = _props.get(0).total_locked;
+          return balanceIt->balance - locked;
         }
 
         // /// @abi action
@@ -163,7 +189,7 @@ namespace golos {
   };
 }
 
-EOSIO_ABI(golos::workers, (add_proposal)(edit_proposal)(del_proposal) \
+APP_DOMAIN_ABI(golos::workers, (add_proposal)(edit_proposal)(del_proposal) \
   (upvote_proposal)(downvote_proposal) \
   (add_comment)(edit_comment)(del_comment) \
   (add_tech_task)(edit_tech_task)(del_tech_task) \
