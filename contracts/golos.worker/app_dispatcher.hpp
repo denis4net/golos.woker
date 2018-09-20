@@ -25,6 +25,8 @@ auto tuple_tail( std::tuple<Ts...> t )
    return  tail_impl( std::make_index_sequence<sizeof...(Ts) - 1u>() , t );
 }
 
+#define LOG_ARGS(...) print_f("%s: %s", __FUNCTION__, #__VA_ARGS__)
+
 template <typename T, typename Q, typename... Args>
 bool execute_action(void (Q::*func)(Args...))
 {
@@ -38,7 +40,7 @@ bool execute_action(void (Q::*func)(Args...))
         read_action_data(buffer, size);
     }
 
-    auto args = unpack<std::tuple<symbol_name /* app domain */, std::decay_t<Args>... /* function args */>>((char *)buffer, size);
+    auto args = unpack<std::tuple<std::decay_t<symbol_name> /* app domain */, std::decay_t<Args>... /* function args */>>((char *)buffer, size);
 
     if (max_stack_buffer_size < size)
     {
@@ -78,7 +80,11 @@ bool execute_action(void (Q::*func)(Args...))
             {                                                                                                                    \
                 switch (action)                                                                                                  \
                 {                                                                                                                \
-                    APP_DOMAIN_API(TYPENAME, MEMBERS)                                                                                \
+                    APP_DOMAIN_API(TYPENAME, MEMBERS)                                                                            \
+                                                                                                                                 \
+                    default:                                                                                                     \
+                        eosio_assert(false, "invalid action");                                                                   \
+                    break;                                                                                                       \
                 }                                                                                                                \
                 /* does not allow destructor of thiscontract to run: eosio_exit(0); */                                           \
             }                                                                                                                    \

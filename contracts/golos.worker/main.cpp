@@ -1,11 +1,10 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/action.hpp>
 #include <eosiolib/currency.hpp>
-#include <array>
+#include <eosiolib/time.hpp>
+
 #include <string>
 #include <vector>
-#include <list>
-#include <ctime>
 #include <algorithm>
 
 #include "token.hpp"
@@ -14,13 +13,15 @@
 using namespace eosio;
 
 #define ID_NOT_DEFINED 0
+#define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, name{_app}.to_string().c_str(), ##__VA_ARGS__);
+
 
 namespace golos
 {
 using std::string;
 
 template <typename T>
-bool contains(vector<T> c, const T& v)
+bool contains(vector<T> c, const T &v)
 {
   return std::find(c.begin(), c.end(), v) != c.end();
 }
@@ -37,25 +38,28 @@ public:
     comment_id_t parent;
     string content;
     account_name author;
-    time_t created;
-    time_t modified;
+    block_timestamp created;
+    block_timestamp modified;
   };
   EOSLIB_SERIALIZE(comment_t, (id)(parent)(content)(author)(created)(modified));
 
   typedef uint64_t tspec_id_t;
-  struct tech_spec_t
+  struct tspec_t
   {
     tspec_id_t id;
     account_name author;
     string content;
-    time_t created;
-    time_t modified;
-    vector<comment_t> upvotes;
-    vector<comment_t> downvotes;
+    vector<account_name> upvotes;
+    vector<account_name> downvotes;
+    vector<comment_t> comments;
+    block_timestamp created;
+    block_timestamp modified;
   };
-  EOSLIB_SERIALIZE(tech_spec_t, (id)(author)(content)(created)(modified)(upvotes)(downvotes));
+  EOSLIB_SERIALIZE(tspec_t, (id)(author)(content)(upvotes)(downvotes)(comments)(created)(modified));
 
   typedef uint64_t popos_id_t;
+
+  //@abi table proposals i64
   struct proposal_t
   {
     popos_id_t id;
@@ -65,37 +69,38 @@ public:
     vector<account_name> upvotes;
     vector<account_name> downvotes;
     vector<comment_t> comments;
-    time_t created;
-    time_t modified;
+    vector<tspec_t> tspecs;
+    block_timestamp created;
+    block_timestamp modified;
     uint64_t primary_key() const { return id; }
   };
 
-  //@abi table proposals i64
-  EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(upvotes)(downvotes)(comments)(created)(modified));
-  typedef multi_index<N(proposals), proposal_t> proposals_t;
-  proposals_t _proposals;
+  EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(upvotes)(downvotes)(comments)(created)(tspecs)(modified));
+  multi_index<N(proposals), proposal_t> _proposals;
 
+  //@abi table states i64
   struct state_t
   {
     asset balance;
     asset total_locked;
-    popos_id_t proposals_counter;
-    comment_id_t comments_counter;
-    tspec_id_t task_counter;
+    popos_id_t proposals_count;
+    comment_id_t comments_count;
+    tspec_id_t tspec_count;
 
     uint64_t primary_key() const { return 0; }
   };
 
-  EOSLIB_SERIALIZE(state_t, (balance)(total_locked)(proposals_counter));
-  typedef multi_index<N(states), state_t> states_t;
-  states_t _states;
+  EOSLIB_SERIALIZE(state_t, (balance)(total_locked)(proposals_count)(comments_count)(tspec_count));
+  multi_index<N(states), state_t> _states;
 
   app_domain_t _app;
 
 protected:
   auto get_state()
   {
-    return _states.find(0);
+    auto itr = _states.find(0);
+    eosio_assert(itr != _states.end(), "worker's pool has not been created for the speicifed app domain");
+    return itr;
   }
 
   symbol_name get_token_symbol()
@@ -103,7 +108,7 @@ protected:
     return get_state()->balance.symbol;
   }
 
-  const asset& get_balance()
+  const asset &get_balance()
   {
     accounts acc(N(golos.token), _self);
     auto balanceIt = acc.find(get_token_symbol());
@@ -123,41 +128,45 @@ protected:
 public:
   workers(account_name owner, app_domain_t app) : contract(owner), _app(app), _states(_self, app), _proposals(_self, app)
   {
+    //TODO: assert if app is not application domain
   }
 
   /// @abi action
-  void create(symbol_name token_symbol)
+  void createpool(symbol_name token_symbol)
   {
-    if (_states.find(0) != _states.end())
-    {
-      _states.emplace(_app, [&](auto &o) {
-        o.balance = asset(0, token_symbol);
-        o.total_locked = asset(0, token_symbol);
-        o.proposals_counter = 1;
-        o.comments_counter = 1;
-        o.task_counter = 1;
-      });
-    }
+    LOG("creating worker's pool: code=\"%\" app=\"%\"", name{_self}.to_string().c_str(), name{_app}.to_string().c_str());
+    eosio_assert(_states.find(0) == _states.end(), "workers pool is already initialized for the specified app domain");
+    require_auth(_app);
+
+    _states.emplace(_app, [&](auto &o) {
+      // o.balance = asset(0, token_symbol);
+      // o.total_locked = asset(0, token_symbol);
+      o.proposals_count = 1;
+      o.comments_count = 1;
+      o.tspec_count = 1;
+    });
   }
 
   /// @abi action
   void addpropos(account_name author, string title, string description)
   {
-    auto state_itr = get_state();
-    popos_id_t id = state_itr->proposals_counter;
     require_auth(author);
+    LOG("adding propos \"%\" by %", title.c_str(), name{author}.to_string().c_str());
+
+    auto state_itr = get_state();
+    popos_id_t id = state_itr->proposals_count;
 
     _proposals.emplace(author, [&](auto &o) {
       o.id = id;
       o.author = author;
       o.title = title;
       o.description = description;
-      o.created = now();
-      o.modified = 0;
+      o.created = block_timestamp(now());
+      o.modified = block_timestamp(0);
     });
 
     _states.modify(state_itr, author, [](auto &o) {
-      o.proposals_counter += 1;
+      o.proposals_count += 1;
     });
   }
 
@@ -184,7 +193,7 @@ public:
 
       if (modified)
       {
-        o.modified = now();
+        o.modified = block_timestamp(now());
       }
     });
   }
@@ -205,7 +214,7 @@ public:
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
     require_auth(author);
-
+    // TODO: assert(author is delegate)
     eosio_assert(!contains(proposal_itr->downvotes, author), "author has already downvoted");
     _proposals.modify(proposal_itr, author, [&](auto &o) {
       o.upvotes.push_back(author);
@@ -218,7 +227,7 @@ public:
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
     require_auth(author);
-
+    // TODO: assert(author is delegate)
     eosio_assert(!contains(proposal_itr->upvotes, author), "author has already downvoted");
 
     _proposals.modify(proposal_itr, author, [&](auto &o) {
@@ -230,7 +239,8 @@ public:
   void addcomment(popos_id_t proposal_id, account_name author, string content)
   {
     auto state_itr = get_state();
-    comment_id_t id = state_itr->comments_counter;
+    comment_id_t id = state_itr->comments_count;
+
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
     require_auth(author);
@@ -240,14 +250,14 @@ public:
       comment.id = id;
       comment.content = content;
       comment.author = author;
-      comment.created = now();
-      comment.modified = 0;
+      comment.created = block_timestamp(now());
+      comment.modified = block_timestamp(0);
 
       o.comments.push_back(comment);
     });
 
     _states.modify(state_itr, author, [](auto &o) {
-      o.comments_counter += 1;
+      o.comments_count += 1;
     });
   }
 
@@ -299,5 +309,4 @@ public:
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::workers, (addpropos)(editpropos)(delpropos)(upvote)(downvote)\
-(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(uvotetspec)(dvotetspec))
+APP_DOMAIN_ABI(golos::workers, (createpool)(addpropos)(editpropos)(delpropos)(upvote)(downvote)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(uvotetspec)(dvotetspec))
