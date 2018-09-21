@@ -1,7 +1,7 @@
 {
   "version": "eosio::abi/1.0",
   "types": [{
-      "new_type_name": "popos_id_t",
+      "new_type_name": "proposal_id_t",
       "type": "uint64"
     },{
       "new_type_name": "comment_id_t",
@@ -27,7 +27,7 @@
           "name": "parent",
           "type": "uint64"
         },{
-          "name": "content",
+          "name": "text",
           "type": "string"
         },{
           "name": "author",
@@ -50,7 +50,7 @@
           "name": "author",
           "type": "account_name"
         },{
-          "name": "content",
+          "name": "text",
           "type": "string"
         },{
           "name": "upvotes",
@@ -113,15 +113,6 @@
         },{
           "name": "total_locked",
           "type": "asset"
-        },{
-          "name": "proposals_count",
-          "type": "uint64"
-        },{
-          "name": "comments_count",
-          "type": "uint64"
-        },{
-          "name": "tspecs_count",
-          "type": "uint64"
         }
       ]
     },{
@@ -143,6 +134,9 @@
           "name": "app_domain",
           "type": "name"
         },{
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },{
           "name": "author",
           "type": "name"
         },{
@@ -161,7 +155,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "title",
           "type": "string"
@@ -178,7 +172,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         }
       ]
     },{
@@ -189,7 +183,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "author",
           "type": "name"
@@ -203,7 +197,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "author",
           "type": "name"
@@ -217,12 +211,15 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
+        },{
+          "name": "comment_id",
+          "type": "comment_id_t"
         },{
           "name": "author",
           "type": "name"
         },{
-          "name": "content",
+          "name": "text",
           "type": "string"
         }
       ]
@@ -234,9 +231,9 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
-          "name": "content",
+          "name": "text",
           "type": "string"
         }
       ]
@@ -248,7 +245,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "comment_id",
           "type": "comment_id_t"
@@ -262,9 +259,9 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
-          "name": "content",
+          "name": "text",
           "type": "string"
         }
       ]
@@ -276,9 +273,9 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
-          "name": "content",
+          "name": "text",
           "type": "string"
         }
       ]
@@ -290,7 +287,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "task_id",
           "type": "tspec_id_t"
@@ -304,7 +301,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "task_id",
           "type": "tspec_id_t"
@@ -321,7 +318,7 @@
           "type": "name"
         },{
           "name": "proposal_id",
-          "type": "popos_id_t"
+          "type": "proposal_id_t"
         },{
           "name": "task_id",
           "type": "tspec_id_t"

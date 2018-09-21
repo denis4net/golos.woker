@@ -2,6 +2,7 @@
 #include <eosiolib/action.hpp>
 #include <eosiolib/currency.hpp>
 #include <eosiolib/time.hpp>
+#include <eosiolib/crypto.h>
 
 #include <string>
 #include <vector>
@@ -14,7 +15,6 @@ using namespace eosio;
 
 #define ID_NOT_DEFINED 0
 #define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, name{_app}.to_string().c_str(), ##__VA_ARGS__);
-
 
 namespace golos
 {
@@ -36,33 +36,34 @@ public:
   {
     comment_id_t id;
     comment_id_t parent;
-    string content;
+    string text;
     account_name author;
     block_timestamp created;
     block_timestamp modified;
+
+    EOSLIB_SERIALIZE(comment_t, (id)(parent)(text)(author)(created)(modified));
   };
-  EOSLIB_SERIALIZE(comment_t, (id)(parent)(content)(author)(created)(modified));
 
   typedef uint64_t tspec_id_t;
   struct tspec_t
   {
     tspec_id_t id;
     account_name author;
-    string content;
+    string text;
     vector<account_name> upvotes;
     vector<account_name> downvotes;
     vector<comment_t> comments;
     block_timestamp created;
     block_timestamp modified;
-  };
-  EOSLIB_SERIALIZE(tspec_t, (id)(author)(content)(upvotes)(downvotes)(comments)(created)(modified));
 
-  typedef uint64_t popos_id_t;
+    EOSLIB_SERIALIZE(tspec_t, (id)(author)(text)(upvotes)(downvotes)(comments)(created)(modified));
+  };
+  typedef uint64_t proposal_id_t;
 
   //@abi table proposals i64
   struct proposal_t
   {
-    popos_id_t id;
+    proposal_id_t id;
     account_name author;
     string title;
     string description;
@@ -73,9 +74,10 @@ public:
     block_timestamp created;
     block_timestamp modified;
     uint64_t primary_key() const { return id; }
+
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(upvotes)(downvotes)(comments)(tspecs)(created)(modified));
   };
 
-  EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(upvotes)(downvotes)(comments)(created)(tspecs)(modified));
   multi_index<N(proposals), proposal_t> _proposals;
 
   //@abi table states i64
@@ -83,14 +85,12 @@ public:
   {
     asset balance;
     asset total_locked;
-    popos_id_t proposals_count;
-    comment_id_t comments_count;
-    tspec_id_t tspec_count;
 
     uint64_t primary_key() const { return 0; }
+
+    EOSLIB_SERIALIZE(state_t, (balance)(total_locked));
   };
 
-  EOSLIB_SERIALIZE(state_t, (balance)(total_locked)(proposals_count)(comments_count)(tspec_count));
   multi_index<N(states), state_t> _states;
 
   app_domain_t _app;
@@ -141,39 +141,28 @@ public:
     _states.emplace(_app, [&](auto &o) {
       // o.balance = asset(0, token_symbol);
       // o.total_locked = asset(0, token_symbol);
-      o.proposals_count = 1;
-      o.comments_count = 1;
-      o.tspec_count = 1;
     });
   }
 
   /// @abi action
-  void addpropos(account_name author, string title, string description)
+  void addpropos(proposal_id_t proposal_id, account_name author, string title, string description)
   {
     require_auth(author);
-    LOG("adding propos \"%\" by %", title.c_str(), name{author}.to_string().c_str());
-
-    auto state_itr = get_state();
-    popos_id_t id = state_itr->proposals_count;
+    LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), name{author}.to_string().c_str());
 
     _proposals.emplace(author, [&](auto &o) {
-      o.id = id;
+      o.id = proposal_id;
       o.author = author;
       o.title = title;
       o.description = description;
       o.created = block_timestamp(now());
       o.modified = block_timestamp(0);
     });
-
-    _states.modify(state_itr, author, [](auto &o) {
-      o.proposals_count += 1;
-    });
   }
 
   // @abi action
-  void editpropos(popos_id_t proposal_id, string title, string description)
+  void editpropos(proposal_id_t proposal_id, string title, string description)
   {
-    auto state_itr = get_state();
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
     require_auth(proposal_itr->author);
@@ -199,7 +188,7 @@ public:
   }
 
   /// @abi action
-  void delpropos(popos_id_t proposal_id)
+  void delpropos(proposal_id_t proposal_id)
   {
     // auto proposal_id = records.find(key);
     // eosio_assert(record_it != records.end(), "record has not been found");
@@ -209,7 +198,7 @@ public:
   }
 
   /// @abi action
-  void upvote(popos_id_t proposal_id, account_name author)
+  void upvote(proposal_id_t proposal_id, account_name author)
   {
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
@@ -222,7 +211,7 @@ public:
   }
 
   /// @abi action
-  void downvote(popos_id_t proposal_id, account_name author)
+  void downvote(proposal_id_t proposal_id, account_name author)
   {
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
@@ -236,63 +225,56 @@ public:
   }
 
   /// @abi action
-  void addcomment(popos_id_t proposal_id, account_name author, string content)
+  void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, account_name author, string text)
   {
-    auto state_itr = get_state();
-    comment_id_t id = state_itr->comments_count;
-
     auto proposal_itr = _proposals.find(proposal_id);
     eosio_assert(proposal_itr != _proposals.end(), "proposal has not been found");
     require_auth(author);
 
     _proposals.modify(proposal_itr, author, [&](auto &o) {
       comment_t comment;
-      comment.id = id;
-      comment.content = content;
+      comment.id = comment_id;
+      comment.text = text;
       comment.author = author;
       comment.created = block_timestamp(now());
       comment.modified = block_timestamp(0);
 
       o.comments.push_back(comment);
     });
-
-    _states.modify(state_itr, author, [](auto &o) {
-      o.comments_count += 1;
-    });
   }
 
   /// @abi action
-  void editcomment(popos_id_t proposal_id, string content)
+  void editcomment(proposal_id_t proposal_id, string text)
   {
   }
 
   /// @abi action
-  void delcomment(popos_id_t proposal_id, comment_id_t comment_id)
+  void delcomment(proposal_id_t proposal_id, comment_id_t comment_id)
   {
   }
 
   /// @abi action
-  void addtspec(popos_id_t proposal_id, string content)
+  void addtspec(proposal_id_t proposal_id, string text)
   {
   }
 
   /// @abi action
-  void edittspec(popos_id_t proposal_id, string content)
+  void edittspec(proposal_id_t proposal_id, string text)
   {
   }
 
   /// @abi action
-  void deltspec(popos_id_t proposal_id, tspec_id_t task_id)
+  void deltspec(proposal_id_t proposal_id, tspec_id_t task_id)
   {
   }
 
   /// @abi action
-  void uvotetspec(popos_id_t proposal_id, tspec_id_t task_id, string comment)
+  void uvotetspec(proposal_id_t proposal_id, tspec_id_t task_id, string comment)
   {
   }
 
   /// @abi action
-  void dvotetspec(popos_id_t proposal_id, tspec_id_t task_id, string comment)
+  void dvotetspec(proposal_id_t proposal_id, tspec_id_t task_id, string comment)
   {
   }
 

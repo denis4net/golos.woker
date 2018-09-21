@@ -1,14 +1,18 @@
 const EOSTest = require('eosio.test')
 
+const eosTest = new EOSTest()
+
+beforeAll(async (done) => {
+  console.log('init')
+  await eosTest.init()
+  done()
+})
+
 it('tests golos.worker contract', async (done) => {
-  const eosTest = new EOSTest()
   const appName = 'app.sample'
 
   console.log('build contract')
   await eosTest.make('contracts/golos.worker')
-
-  console.log('init')
-  await eosTest.init()
 
   console.log('create test account')
   await eosTest.newAccount('user1')
@@ -31,24 +35,41 @@ it('tests golos.worker contract', async (done) => {
   console.log(await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'states', ));
 
   console.log('addpropos')
-  const proposalId = await contract.addpropos(appName, 'user1', 'Proposal #1', "Let's create golos workre's pool", {authorization: 'user1'})
-  console.log(proposalId)
   console.log(await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'proposals', ));
 
-  console.log('upvote')
-  await contract.upvote(appName, proposalId, 'delegate1', {authorization: 'delegate1'})
-  console.log('downvote')
-  await contract.downvote(appName, proposalId, 'delegate2', {authorization: 'delegate2'})
+  const proposals = [
+    {id: 0, title: "Proposal #1", text: "Let's create worker's pool", user: "user1"},
+    {id: 1, title: "Proposal #2", text: "Let's create golos fork", user: "delegate1"}
+  ]
 
-  console.log('addcomment')
-  comments.push(await contract.addcomment(appName, proposalId, 'delegate1', "Let's create!", {authorization: 'delegate1'}))
-  comments.push(await contract.addcomment(appName, proposalId, 'delegate2', 'No.....!', {authorization: 'delegate2'}))
-  console.log('delproposal')
-  await contract.del_proposal(appName, proposalId)
+  const comments =  [
+    {id: 0, user: 'delegate1', text: "Let's do it!"},
+    {id: 1, user: 'delegate2', text: 'Noooo!'}
+  ]
 
-  await contract.delcomment(appName, comments[0], {authorization: 'delegate1'})
-  await contract.delcomment(appName, comemnts[1], {authorization: 'delegate2'})
+  for (let proposal of proposals) {
+    console.log(proposal)
+    await contract.addpropos(appName, proposal.id, proposal.user, proposal.title, proposal.text, {authorization: proposal.user})
+    await contract.upvote(appName, proposal.id, 'delegate1', {authorization: 'delegate1'})
+    await contract.downvote(appName, proposal.id, 'delegate2', {authorization: 'delegate2'})
 
-  await eosTest.destroy()
+    for (let comment of comments) {
+      console.log('addcomment', comment)
+      await contract.addcomment(appName, proposal.id, comment.id, comment.user, comment.text, {authorization: comment.user})
+
+    }
+  }
+
+  console.log('proposals table', await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'proposals', ));
+
+  for (let proposal of proposals) {
+    for (let comment of comments) {
+      console.log('delcomment', proposal, comment)
+      await contract.delcomment(appName, proposal.id, comment.id, {authorization: comment.user})
+    }
+
+    await contract.delpropos(appName, proposal.id, {authorization: proposal.user})
+  }
+
   done()
-}, 120000)
+}, 300000)
