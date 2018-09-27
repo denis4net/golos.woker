@@ -41,6 +41,17 @@
         }
       ]
     },{
+      "name": "tspec_vote_t",
+      "base": "",
+      "fields": [{
+          "name": "author",
+          "type": "account_name"
+        },{
+          "name": "comment",
+          "type": "string"
+        }
+      ]
+    },{
       "name": "tspec_t",
       "base": "",
       "fields": [{
@@ -54,13 +65,10 @@
           "type": "string"
         },{
           "name": "upvotes",
-          "type": "account_name[]"
+          "type": "tspec_vote_t[]"
         },{
           "name": "downvotes",
-          "type": "account_name[]"
-        },{
-          "name": "comments",
-          "type": "comment_t[]"
+          "type": "tspec_vote_t[]"
         },{
           "name": "created",
           "type": "block_timestamp"
@@ -233,6 +241,9 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
+          "name": "comment_id",
+          "type": "comment_id_t"
+        },{
           "name": "text",
           "type": "string"
         }
@@ -261,6 +272,12 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
+          "name": "tspec_id",
+          "type": "tspec_id_t"
+        },{
+          "name": "autrhor",
+          "type": "name"
+        },{
           "name": "text",
           "type": "string"
         }
@@ -274,6 +291,9 @@
         },{
           "name": "proposal_id",
           "type": "proposal_id_t"
+        },{
+          "name": "tspec_id",
+          "type": "tspec_id_t"
         },{
           "name": "text",
           "type": "string"
@@ -303,8 +323,11 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
-          "name": "task_id",
+          "name": "tspec_id",
           "type": "tspec_id_t"
+        },{
+          "name": "autrhor",
+          "type": "name"
         },{
           "name": "comment",
           "type": "string"
@@ -320,8 +343,11 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
-          "name": "task_id",
+          "name": "tspec_id",
           "type": "tspec_id_t"
+        },{
+          "name": "autrhor",
+          "type": "name"
         },{
           "name": "comment",
           "type": "string"

@@ -11,6 +11,11 @@ beforeAll(async (done) => {
 it('tests golos.worker contract', async (done) => {
   const appName = 'app.sample'
 
+  console.log('build & deploy token contract')
+  await eosTest.make('contracts/golos.token')
+  await eosTest.newAccount('golos.token')
+  const tokenContract = await eosTest.deploy('golos.token', 'contracts/golos.token/golos.token.wasm', 'contracts/golos.token/golos.token.abi')
+
   console.log('build contract')
   await eosTest.make('contracts/golos.worker')
 
@@ -26,6 +31,9 @@ it('tests golos.worker contract', async (done) => {
 
   console.log('create an app.sample account')
   await eosTest.newAccount(appName)
+
+  console.log('create app token')
+  await tokenContract.create(appName, `1000000000 APP`, {authorization: 'golos.token'})
 
   console.log('deploy contract')
   const contract = await eosTest.deploy('golos.worker', 'contracts/golos.worker/golos.worker.wasm', 'contracts/golos.worker/golos.worker.abi')
