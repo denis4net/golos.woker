@@ -302,11 +302,8 @@ public:
     eosio_assert(comment != proposal->comments.end(), "comment doesn't exist");
     require_app_member(comment->author);
 
-    _proposals.modify(proposal, proposal->author, [&](auto &o) {
-      o.comments.erase(std::remove_if(o.comments.begin(), o.comments.end(), [&](const comment_t &comment) {
-                         return comment.id == comment_id;
-                       }),
-                       o.comments.end());
+    _proposals.modify(proposal, proposal->author, [&](auto &proposal) {
+      proposal.comments.erase(getcomment(proposal, comment_id));
     });
   }
 
@@ -429,6 +426,8 @@ public:
   void transfer(uint64_t code /* code == golos.token */)
   {
     auto data = unpack_action_data<currency::transfer>();
+    LOG("transfer % from \"%\" to \"%\"", data.quantity.amount, name{data.from}.to_string().c_str(), name{data.to}.to_string().c_str());
+
     if (data.from == _self || data.to != _self)
       return;
 

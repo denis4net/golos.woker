@@ -34,16 +34,20 @@ it('tests golos.worker contract', async (done) => {
 
   console.log('create app token')
   await tokenContract.create(appName, `1000000000 APP`, {authorization: 'golos.token'})
+  await tokenContract.issue(appName, `1000000000 APP`, {authorization: appName})
 
-  console.log('deploy contract')
+  console.log('deploy golos.worker contract')
   const contract = await eosTest.deploy('golos.worker', 'contracts/golos.worker/golos.worker.wasm', 'contracts/golos.worker/golos.worker.abi')
 
   console.log('create')
   await contract.createpool(appName, appName, {authorization: appName})
   console.log(await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'states', ));
 
+  console.log("Workers pool replenishment")
+  await tokenContract.transfer(appName, "golos.worker", "1000 APP", "Workers pool replenishment #1")
+  await tokenContract.transfer(appName, "golos.worker", "500 APP", "Workers pool replenishment #1")
+
   console.log('addpropos')
-  console.log(await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'proposals', ));
 
   const proposals = [
     {id: 0, title: "Proposal #1", text: "Let's create worker's pool", user: "user1"},
