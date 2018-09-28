@@ -353,6 +353,17 @@
           "type": "string"
         }
       ]
+    },{
+      "name": "transfer",
+      "base": "",
+      "fields": [{
+          "name": "app_domain",
+          "type": "name"
+        },{
+          "name": "code",
+          "type": "name"
+        }
+      ]
     }
   ],
   "actions": [{
@@ -410,6 +421,10 @@
     },{
       "name": "dvotetspec",
       "type": "dvotetspec",
+      "ricardian_contract": ""
+    },{
+      "name": "transfer",
+      "type": "transfer",
       "ricardian_contract": ""
     }
   ],

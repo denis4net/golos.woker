@@ -26,7 +26,7 @@ bool contains(vector<T> c, const T &v)
   return std::find(c.begin(), c.end(), v) != c.end();
 }
 
-class workers : public contract
+class worker : public contract
 {
 public:
   typedef symbol_name app_domain_t;
@@ -144,7 +144,7 @@ protected:
   }
 
 public:
-  workers(account_name owner, app_domain_t app) : contract(owner), _app(app), _states(_self, app), _proposals(_self, app)
+  worker(account_name owner, app_domain_t app) : contract(owner), _app(app), _states(_self, app), _proposals(_self, app)
   {
     //TODO: assert if app is not application domain
   }
@@ -243,13 +243,15 @@ public:
     });
   }
 
-  const auto getcomment(const proposal_t& proposal, comment_id_t comment_id) {
+  const auto getcomment(const proposal_t &proposal, comment_id_t comment_id)
+  {
     return std::find_if(proposal.comments.begin(), proposal.comments.end(), [&](const auto &o) {
       return o.id == comment_id;
     });
   }
 
-  auto getcomment(proposal_t& proposal, comment_id_t comment_id) {
+  auto getcomment(proposal_t &proposal, comment_id_t comment_id)
+  {
     return std::find_if(proposal.comments.begin(), proposal.comments.end(), [&](auto &o) {
       return o.id == comment_id;
     });
@@ -295,7 +297,6 @@ public:
   {
     auto proposal = _proposals.find(proposal_id);
     eosio_assert(proposal != _proposals.end(), "proposal has not been found");
-    require_app_member(proposal->author);
 
     const auto comment = getcomment(*proposal, comment_id);
     eosio_assert(comment != proposal->comments.end(), "comment doesn't exist");
@@ -422,17 +423,30 @@ public:
     });
   }
 
-  // /// @abi action
-  // // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
-  // void transfer(account_name self, uint64_t code /* code == eosio.token */) {
-  //   auto data = unpack_action_data<currency::transfer>();
-  //   if(data.from == self || data.to != self)
-  //       return;
 
-  //   eosio_assert(data.quantity.is_valid(), "Quntity is invalid");
-  //   eosio_assert(data.quantity.amount > 0, "Invalid transfer amount");
-  // }
-}; // namespace golos
+  // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
+  /// @abi action
+  void transfer(uint64_t code /* code == golos.token */)
+  {
+    auto data = unpack_action_data<currency::transfer>();
+    if (data.from == _self || data.to != _self)
+      return;
+
+  /**
+   struct transfer
+     {
+        account_name from;
+        account_name to;
+        asset        quantity;
+        string       memo;
+
+        EOSLIB_SERIALIZE( transfer, (from)(to)(quantity)(memo) )
+      };
+    */
+    eosio_assert(data.quantity.is_valid(), "Quntity is invalid");
+    eosio_assert(data.quantity.amount > 0, "Invalid transfer amount");
+  }
+};
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::workers, (createpool)(addpropos)(editpropos)(delpropos)(upvote)(downvote)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(uvotetspec)(dvotetspec))
+APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos)(editpropos)(delpropos)(upvote)(downvote)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(uvotetspec)(dvotetspec))
