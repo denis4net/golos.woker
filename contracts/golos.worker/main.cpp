@@ -13,8 +13,11 @@
 
 using namespace eosio;
 
-#define ID_NOT_DEFINED 0
 #define TOKEN_ACCOUNT N(golos.token)
+#define ZERO_ASSET asset(0, get_state()->token_symbol)
+#define TIMESTAMP_UNDEFINED block_timestamp(0)
+#define TIMESTAMP_NOW block_timestamp(now())
+
 #define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, name{_app}.to_string().c_str(), ##__VA_ARGS__);
 
 namespace golos
@@ -53,19 +56,72 @@ public:
     EOSLIB_SERIALIZE(tspec_bid_vote_t, (author)(comment));
   };
 
+  struct tspec_data_t {
+    string text;
+    asset specification_cost;
+    block_timestamp specification_eta;
+    asset development_cost;
+    block_timestamp development_eta;
+    uint8_t payments_count;
+
+    EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
+  };
+
   struct tspec_bid_t
   {
     tspec_bid_id_t id;
     account_name author;
-    string text;
+
+    tspec_data_t data;
+
     vector<tspec_bid_vote_t> upvotes;
     vector<tspec_bid_vote_t> downvotes;
-    asset cost;
-    block_timestamp estimate;
+
     block_timestamp created;
     block_timestamp modified;
 
-    EOSLIB_SERIALIZE(tspec_bid_t, (id)(author)(text)(upvotes)(downvotes)(cost)(estimate)(created)(modified));
+    EOSLIB_SERIALIZE(tspec_bid_t, (id)(author)(data)(upvotes)(downvotes)(created)(modified));
+
+    tspec_bid_t() : created(TIMESTAMP_NOW) {}
+    tspec_bid_t(tspec_bid_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
+
+    void update(const tspec_data_t &that)
+    {
+      if (!that.text.empty())
+      {
+        data.text = that.text;
+      }
+      if (that.specification_cost.amount != 0)
+      {
+        data.specification_cost = that.specification_cost;
+      }
+
+      if (that.specification_eta != TIMESTAMP_UNDEFINED)
+      {
+        data.specification_eta = that.specification_eta;
+      }
+
+      if (that.development_cost.amount != 0)
+      {
+        data.development_cost = that.development_cost;
+      }
+
+      if (that.development_eta != TIMESTAMP_UNDEFINED)
+      {
+        data.development_eta = that.development_eta;
+      }
+
+      if (that.payments_count != 0)
+      {
+        data.payments_count = that.payments_count;
+      }
+    }
+
+    void modify(const tspec_data_t &that)
+    {
+      update(that);
+      modified = TIMESTAMP_NOW;
+    }
   };
   typedef uint64_t proposal_id_t;
 
@@ -361,53 +417,37 @@ public:
   }
 
   /// @abi action
-  void
-  addtspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, string text, asset cost, block_timestamp estimate)
+  void addtspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_id, account_name author, const tspec_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
-    eosio_assert(gettspec(*proposal, tspec_bid_id) == proposal->tspec_bids.end(),
+    const auto tspec = gettspec(*proposal, tspec_id) ;
+    eosio_assert(tspec == proposal->tspec_bids.end(),
                  "technical specification is already exists with the same id");
 
     get_proposals().modify(proposal, author, [&](auto &o) {
-      tspec_bid_t spec;
-      spec.id = tspec_bid_id;
-      spec.author = author;
-      spec.text = text;
-      spec.created = block_timestamp(now());
-      spec.modified = block_timestamp(0);
-      spec.cost = cost;
-      spec.estimate = estimate;
+      tspec_bid_t spec(tspec_id, author);
+      spec.update(data);
       o.tspec_bids.push_back(spec);
     });
   }
 
   /// @abi action
-  void edittspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, string text, asset cost, block_timestamp estimate)
+  void edittspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, const tspec_data_t &that)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     const auto tspec = gettspec(*proposal, tspec_bid_id);
     eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
-    eosio_assert(cost.symbol == get_state()->token_symbol, "invalid token symbol");
-    require_app_member(tspec->author);
+    eosio_assert(that.specification_cost.symbol == get_state()->token_symbol, "invalid token symbol");
+    eosio_assert(that.development_cost.symbol == get_state()->token_symbol, "invalid token symbol");
 
+    require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_bid_id);
-      if (!text.empty())
-      {
-        tspec->text = text;
-      }
-
-      if (cost != asset(0, get_state()->token_symbol)) {
-        tspec->cost = cost;
-      }
-
-      if (estimate != block_timestamp(0)) {
-        tspec->estimate = estimate;
-      }
+      tspec->modify(that);
     });
   }
 

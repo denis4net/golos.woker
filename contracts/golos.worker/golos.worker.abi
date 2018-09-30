@@ -52,6 +52,29 @@
         }
       ]
     },{
+      "name": "tspec_data_t",
+      "base": "",
+      "fields": [{
+          "name": "text",
+          "type": "string"
+        },{
+          "name": "specification_cost",
+          "type": "asset"
+        },{
+          "name": "specification_eta",
+          "type": "block_timestamp"
+        },{
+          "name": "development_cost",
+          "type": "asset"
+        },{
+          "name": "development_eta",
+          "type": "block_timestamp"
+        },{
+          "name": "payments_count",
+          "type": "uint8"
+        }
+      ]
+    },{
       "name": "tspec_bid_t",
       "base": "",
       "fields": [{
@@ -61,8 +84,8 @@
           "name": "author",
           "type": "account_name"
         },{
-          "name": "text",
-          "type": "string"
+          "name": "data",
+          "type": "tspec_data_t"
         },{
           "name": "upvotes",
           "type": "tspec_bid_vote_t[]"
@@ -71,12 +94,6 @@
           "type": "tspec_bid_vote_t[]"
         },{
           "name": "created",
-          "type": "block_timestamp"
-        },{
-          "name": "cost",
-          "type": "asset"
-        },{
-          "name": "estimate",
           "type": "block_timestamp"
         },{
           "name": "modified",
@@ -289,11 +306,11 @@
           "name": "tspec_bid_id",
           "type": "tspec_bid_id_t"
         },{
-          "name": "autrhor",
+          "name": "author",
           "type": "name"
         },{
-          "name": "text",
-          "type": "string"
+          "name": "data",
+          "type": "tspec_data_t"
         }
       ]
     },{
@@ -309,8 +326,8 @@
           "name": "tspec_bid_id",
           "type": "tspec_bid_id_t"
         },{
-          "name": "text",
-          "type": "string"
+          "name": "data",
+          "type": "tspec_data_t"
         }
       ]
     },{
