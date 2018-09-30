@@ -78,14 +78,14 @@ it('tests golos.worker contract', async (done) => {
 
   console.log('proposals table', await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'proposals', ));
 
-  for (let proposal of proposals) {
-    for (let comment of comments) {
-      console.log('delcomment', proposal, comment)
-      await contract.delcomment(appName, proposal.id, comment.id, {authorization: comment.user})
-    }
+  // for (let proposal of proposals) {
+  //   for (let comment of comments) {
+  //     console.log('delcomment', proposal, comment)
+  //     await contract.delcomment(appName, proposal.id, comment.id, {authorization: comment.user})
+  //   }
 
-    await contract.delpropos(appName, proposal.id, {authorization: proposal.user})
-  }
+  //   await contract.delpropos(appName, proposal.id, {authorization: proposal.user})
+  // }
 
   done()
 }, 300000)
