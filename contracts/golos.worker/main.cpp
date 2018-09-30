@@ -93,12 +93,11 @@ public:
   //@abi table states i64
   struct state_t
   {
-    asset balance;
-    asset total_locked;
+    symbol_name token_symbol;
 
     uint64_t primary_key() const { return 0; }
 
-    EOSLIB_SERIALIZE(state_t, (balance)(total_locked));
+    EOSLIB_SERIALIZE(state_t, (token_symbol));
   };
 
   typedef multi_index<N(states), state_t> states_t;
@@ -124,28 +123,6 @@ protected:
     auto itr = _states->find(0);
     eosio_assert(itr != get_states().end(), "worker's pool has not been created for the speicifed app domain");
     return itr;
-  }
-
-  symbol_name get_token_symbol()
-  {
-    return get_state()->balance.symbol;
-  }
-
-  const asset &get_balance()
-  {
-    accounts acc(N(golos.token), _self);
-    auto balanceIt = acc.find(get_token_symbol());
-    eosio_assert(balanceIt != acc.end(), "token symbol does not exists");
-    return balanceIt->balance;
-  }
-
-  const asset get_locked()
-  {
-    accounts acc(N(golos.token), _self);
-    auto balanceIt = acc.find(get_token_symbol());
-    eosio_assert(balanceIt != acc.end(), "token symbol does not exists");
-    auto locked = get_state()->total_locked;
-    return balanceIt->balance - locked;
   }
 
   void require_app_member(account_name account)
@@ -205,7 +182,8 @@ public:
   {
   }
 
-  ~worker() {
+  ~worker()
+  {
     delete _proposals;
     delete _states;
     delete _funds;
@@ -219,8 +197,7 @@ public:
     require_auth(_app);
 
     get_states().emplace(_app, [&](auto &o) {
-      // o.balance = asset(0, token_symbol);
-      // o.total_locked = asset(0, token_symbol);
+      o.token_symbol = token_symbol;
     });
   }
 
@@ -385,7 +362,7 @@ public:
 
   /// @abi action
   void
-  addtspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, string text)
+  addtspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, string text, asset cost, block_timestamp estimate)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -400,22 +377,37 @@ public:
       spec.text = text;
       spec.created = block_timestamp(now());
       spec.modified = block_timestamp(0);
+      spec.cost = cost;
+      spec.estimate = estimate;
       o.tspec_bids.push_back(spec);
     });
   }
 
   /// @abi action
-  void edittspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, string text)
+  void edittspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, string text, asset cost, block_timestamp estimate)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     const auto tspec = gettspec(*proposal, tspec_bid_id);
     eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
+    eosio_assert(cost.symbol == get_state()->token_symbol, "invalid token symbol");
     require_app_member(tspec->author);
+
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_bid_id);
-      tspec->text = text;
+      if (!text.empty())
+      {
+        tspec->text = text;
+      }
+
+      if (cost != asset(0, get_state()->token_symbol)) {
+        tspec->cost = cost;
+      }
+
+      if (estimate != block_timestamp(0)) {
+        tspec->estimate = estimate;
+      }
     });
   }
 
@@ -427,6 +419,7 @@ public:
     auto tspec = gettspec(*proposal, tspec_bid_id);
     eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
+    eosio_assert(tspec->upvotes.empty(), "technical specification bid can't be deleted because it already has been upvoted"); //Technical Specification 1.e
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       o.tspec_bids.erase(gettspec(o, tspec_bid_id));
@@ -489,7 +482,7 @@ public:
     init(eosio::string_to_name(t.memo.c_str()));
     LOG("transfer % from \"%\" to \"%\"", t.quantity.amount, name{t.from}.to_string().c_str(), name{t.to}.to_string().c_str());
 
-    if (t.to != _self)
+    if (t.to != _self || t.quantity.symbol == get_state()->token_symbol)
     {
       LOG("transfer from a wrong token");
       return;

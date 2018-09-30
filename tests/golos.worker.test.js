@@ -41,7 +41,7 @@ it('tests golos.worker contract', async (done) => {
   const contract = await eosTest.deploy('golos.worker', 'contracts/golos.worker/golos.worker.wasm', 'contracts/golos.worker/golos.worker.abi')
 
   console.log('create')
-  await contract.createpool(appName, appName, {authorization: appName})
+  await contract.createpool(appName, tokenSymbol, {authorization: appName})
   console.log('states table:', await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'states'));
 
   console.log("Workers pool replenishment")

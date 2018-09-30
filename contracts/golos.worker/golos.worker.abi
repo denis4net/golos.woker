@@ -122,11 +122,8 @@
       "name": "state_t",
       "base": "",
       "fields": [{
-          "name": "balance",
-          "type": "asset"
-        },{
-          "name": "total_locked",
-          "type": "asset"
+          "name": "token_symbol",
+          "type": "name"
         }
       ]
     },{
@@ -149,7 +146,7 @@
           "type": "name"
         },{
           "name": "token_symbol",
-          "type": "name"
+          "type": "symbol_code"
         }
       ]
     },{
