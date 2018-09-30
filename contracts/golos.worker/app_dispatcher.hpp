@@ -25,10 +25,8 @@ auto tuple_tail( std::tuple<Ts...> t )
    return  tail_impl( std::make_index_sequence<sizeof...(Ts) - 1u>() , t );
 }
 
-#define LOG_ARGS(...) print_f("%s: %s", __FUNCTION__, #__VA_ARGS__)
-
 template <typename T, typename Q, typename... Args>
-bool execute_action(void (Q::*func)(Args...))
+bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args...))
 {
     size_t size = action_data_size();
     //using malloc/free here potentially is not exception-safe, although WASM doesn't support exceptions
@@ -47,7 +45,7 @@ bool execute_action(void (Q::*func)(Args...))
         free(buffer);
     }
 
-    T obj(current_receiver(), tuple_head(args));
+    T obj(receiver, tuple_head(args));
 
     auto f2 = [&](auto... a) {
         (obj.*func)(a...);
@@ -57,37 +55,75 @@ bool execute_action(void (Q::*func)(Args...))
     return true;
 }
 
-#define APP_DOMAIN_API_CALL(r, TYPENAME, elem)                    \
-    case ::eosio::string_to_name(BOOST_PP_STRINGIZE(elem)): \
-        ::golos::execute_action<TYPENAME>(&TYPENAME::elem);        \
+#define APP_ACTION_API_CALL(r, TYPENAME, elem)                      \
+    case ::eosio::string_to_name(BOOST_PP_STRINGIZE(elem)):         \
+        ::golos::execute_app_action<TYPENAME>(receiver, code, &TYPENAME::elem);         \
         break;
 
-#define APP_DOMAIN_API(TYPENAME, MEMBERS) \
-    BOOST_PP_SEQ_FOR_EACH(APP_DOMAIN_API_CALL, TYPENAME, MEMBERS)
+#define APP_ACTIONS(TYPENAME, MEMBERS)                              \
+    BOOST_PP_SEQ_FOR_EACH(APP_ACTION_API_CALL, TYPENAME, MEMBERS)
 
-#define APP_DOMAIN_ABI(TYPENAME, MEMBERS)                                                                                            \
+
+template <typename T, typename Q, typename... Args>
+bool execute_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args...))
+{
+    size_t size = action_data_size();
+    //using malloc/free here potentially is not exception-safe, although WASM doesn't support exceptions
+    constexpr size_t max_stack_buffer_size = 512;
+    void *buffer = nullptr;
+    if (size > 0)
+    {
+        buffer = max_stack_buffer_size < size ? malloc(size) : alloca(size);
+        read_action_data(buffer, size);
+    }
+
+    auto args = unpack<std::tuple<std::decay_t<Args>... /* function args */>>((char *)buffer, size);
+
+    if (max_stack_buffer_size < size)
+    {
+        free(buffer);
+    }
+
+    T obj(receiver);
+
+    auto f2 = [&](auto... a) {
+        (obj.*func)(a...);
+    };
+
+    boost::mp11::tuple_apply(f2, args);
+    return true;
+}
+
+
+#define ACTION_API_CALL(r, TYPENAME, elem)                          \
+    case ::eosio::string_to_name(BOOST_PP_STRINGIZE(elem)):         \
+        ::golos::execute_action<TYPENAME>(receiver, code, &TYPENAME::elem);         \
+        break;
+
+#define ACTIONS(TYPENAME, MEMBERS) \
+    BOOST_PP_SEQ_FOR_EACH(ACTION_API_CALL, TYPENAME, MEMBERS)
+
+
+
+/**
+ * when an action is sent to the network, it specifically addresses a single contract account (the "code" account) and an action on that account.
+ * However, the contract can use require_recipient to notify another account of the action so that a contract on that account may respond.
+ * When it does this, it does not change the "code" account.
+ */
+#define APP_DOMAIN_ABI(TYPENAME, APP_MEMBERS /* actions that expect app_domain argument */, MEMBERS /* actions that*/)           \
     extern "C"                                                                                                                   \
     {                                                                                                                            \
         void apply(uint64_t receiver, uint64_t code, uint64_t action)                                                            \
         {                                                                                                                        \
-            auto self = receiver;                                                                                                \
-            if (action == N(onerror))                                                                                            \
+            switch (action)                                                                                                      \
             {                                                                                                                    \
-                /* onerror is only valid if it is for the "eosio" code account and authorized by "eosio"'s "active permission */ \
-                eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account");             \
-            }                                                                                                                    \
-            if (code == self || action == N(onerror))                                                                            \
-            {                                                                                                                    \
-                switch (action)                                                                                                  \
-                {                                                                                                                \
-                    APP_DOMAIN_API(TYPENAME, MEMBERS)                                                                            \
+                APP_ACTIONS(TYPENAME, APP_MEMBERS)                                                                               \
+                ACTIONS(TYPENAME, MEMBERS)                                                                                       \
                                                                                                                                  \
-                    default:                                                                                                     \
-                        eosio_assert(false, "invalid action");                                                                   \
-                    break;                                                                                                       \
-                }                                                                                                                \
-                /* does not allow destructor of thiscontract to run: eosio_exit(0); */                                           \
+                default:                                                                                                         \
+                    eosio_assert(false, "invalid action");                                                                       \
+                break;                                                                                                           \
             }                                                                                                                    \
         }                                                                                                                        \
     }                                                                                                                            \
-} // namespace app
+}

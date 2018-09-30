@@ -10,6 +10,7 @@ beforeAll(async (done) => {
 
 it('tests golos.worker contract', async (done) => {
   const appName = 'app.sample'
+  const tokenSymbol = 'APP'
 
   console.log('build & deploy token contract')
   await eosTest.make('contracts/golos.token')
@@ -33,22 +34,25 @@ it('tests golos.worker contract', async (done) => {
   await eosTest.newAccount(appName)
 
   console.log('create app token')
-  await tokenContract.create(appName, `1000000000 APP`, {authorization: 'golos.token'})
-  await tokenContract.issue(appName, `1000000000 APP`, {authorization: appName})
+  await tokenContract.create(appName, `1000000000 ${tokenSymbol}`, {authorization: 'golos.token'})
+  await tokenContract.issue(appName, `1000000000 ${tokenSymbol}`, {authorization: appName})
 
   console.log('deploy golos.worker contract')
   const contract = await eosTest.deploy('golos.worker', 'contracts/golos.worker/golos.worker.wasm', 'contracts/golos.worker/golos.worker.abi')
 
   console.log('create')
   await contract.createpool(appName, appName, {authorization: appName})
-  console.log(await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'states', ));
+  console.log('states table:', await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'states'));
 
   console.log("Workers pool replenishment")
-  await tokenContract.transfer(appName, "golos.worker", "1000 APP", "Workers pool replenishment #1")
-  await tokenContract.transfer(appName, "golos.worker", "500 APP", "Workers pool replenishment #1")
+  await tokenContract.transfer(appName, "golos.worker", `1000 ${tokenSymbol}`, appName /* memo */)
+  await tokenContract.transfer(appName, "golos.worker", `500 ${tokenSymbol}`, appName /* memo */)
+  let funds = await eosTest.eos.getTableRows(true, 'golos.worker', appName, 'funds', appName)
+  console.log('funds table:', funds)
+  expect(funds.rows.length).not.toEqual(0)
+  expect(funds.rows[0].quantity).toEqual(`1500 ${tokenSymbol}`)
 
   console.log('addpropos')
-
   const proposals = [
     {id: 0, title: "Proposal #1", text: "Let's create worker's pool", user: "user1"},
     {id: 1, title: "Proposal #2", text: "Let's create golos fork", user: "delegate1"}

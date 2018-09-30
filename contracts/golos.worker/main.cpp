@@ -14,6 +14,7 @@
 using namespace eosio;
 
 #define ID_NOT_DEFINED 0
+#define TOKEN_ACCOUNT N(golos.token)
 #define LOG(format, ...) print_f("%(%): " format "\n", __FUNCTION__, name{_app}.to_string().c_str(), ##__VA_ARGS__);
 
 namespace golos
@@ -84,7 +85,8 @@ public:
     EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(upvotes)(downvotes)(comments)(tspecs)(created)(modified));
   };
 
-  multi_index<N(proposals), proposal_t> _proposals;
+  typedef multi_index<N(proposals), proposal_t> proposals_t;
+  proposals_t *_proposals = nullptr;
 
   //@abi table states i64
   struct state_t
@@ -97,15 +99,28 @@ public:
     EOSLIB_SERIALIZE(state_t, (balance)(total_locked));
   };
 
-  multi_index<N(states), state_t> _states;
+  typedef multi_index<N(states), state_t> states_t;
+  states_t *_states = nullptr;
 
-  app_domain_t _app;
+  //@abi table funds i64
+  struct fund_t
+  {
+    account_name owner;
+    asset quantity;
+    uint64_t primary_key() const { return owner; }
+    EOSLIB_SERIALIZE(fund_t, (owner)(quantity));
+  };
+
+  typedef multi_index<N(funds), fund_t> funds_t;
+  funds_t *_funds = nullptr;
+
+  app_domain_t _app = 0;
 
 protected:
   auto get_state()
   {
-    auto itr = _states.find(0);
-    eosio_assert(itr != _states.end(), "worker's pool has not been created for the speicifed app domain");
+    auto itr = _states->find(0);
+    eosio_assert(itr != get_states().end(), "worker's pool has not been created for the speicifed app domain");
     return itr;
   }
 
@@ -143,20 +158,65 @@ protected:
     //TODO: eosio_assert(golos.ctrl::is_witness(account, _app), "app domain delegate authority is required to do this action");
   }
 
-public:
-  worker(account_name owner, app_domain_t app) : contract(owner), _app(app), _states(_self, app), _proposals(_self, app)
+  void withdraw(asset quantity, string memo = "")
   {
-    //TODO: assert if app is not application domain
+    action(
+        permission_level{_self, N(active)},
+        TOKEN_ACCOUNT, N(transfer),
+        std::make_tuple(_self, _self, quantity, std::string("")))
+        .send();
+  }
+
+  void init(app_domain_t app)
+  {
+    _app = app;
+    _states = new states_t(_self, app);
+    _proposals = new proposals_t(_self, app);
+    _funds = new funds_t(_self, app);
+  }
+
+  states_t &get_states()
+  {
+    eosio_assert(_states != nullptr, "contract is not initialized");
+    return *_states;
+  }
+
+  proposals_t &get_proposals()
+  {
+    eosio_assert(_proposals != nullptr, "contract is not initialized");
+    return *_proposals;
+  }
+
+  funds_t &get_funds()
+  {
+    eosio_assert(_funds != nullptr, "contract is not initialized");
+    return *_funds;
+  }
+
+public:
+  worker(account_name owner, app_domain_t app) : contract(owner)
+  {
+    init(app);
+  }
+
+  worker(account_name owner) : contract(owner)
+  {
+  }
+
+  ~worker() {
+    delete _proposals;
+    delete _states;
+    delete _funds;
   }
 
   /// @abi action
   void createpool(symbol_name token_symbol)
   {
     LOG("creating worker's pool: code=\"%\" app=\"%\"", name{_self}.to_string().c_str(), name{_app}.to_string().c_str());
-    eosio_assert(_states.find(0) == _states.end(), "workers pool is already initialized for the specified app domain");
+    eosio_assert(get_states().find(0) == get_states().end(), "workers pool is already initialized for the specified app domain");
     require_auth(_app);
 
-    _states.emplace(_app, [&](auto &o) {
+    get_states().emplace(_app, [&](auto &o) {
       // o.balance = asset(0, token_symbol);
       // o.total_locked = asset(0, token_symbol);
     });
@@ -169,7 +229,7 @@ public:
 
     LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), name{author}.to_string().c_str());
 
-    _proposals.emplace(author, [&](auto &o) {
+    get_proposals().emplace(author, [&](auto &o) {
       o.id = proposal_id;
       o.author = author;
       o.title = title;
@@ -182,11 +242,11 @@ public:
   // @abi action
   void editpropos(proposal_id_t proposal_id, string title, string description)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_member(proposal->author);
 
-    _proposals.modify(proposal, proposal->author, [&](auto &o) {
+    get_proposals().modify(proposal, proposal->author, [&](auto &o) {
       bool modified = false;
       if (!description.empty())
       {
@@ -209,22 +269,22 @@ public:
   /// @abi action
   void delpropos(proposal_id_t proposal_id)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     eosio_assert(proposal->upvotes.size() == 0, "proposal has been approved by one member");
     require_app_member(proposal->author);
-    _proposals.erase(proposal);
+    get_proposals().erase(proposal);
   }
 
   /// @abi action
   void upvote(proposal_id_t proposal_id, account_name author)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_delegate(author);
     // TODO: assert(author is delegate)
     eosio_assert(!contains(proposal->downvotes, author), "author has already downvoted");
-    _proposals.modify(proposal, author, [&](auto &o) {
+    get_proposals().modify(proposal, author, [&](auto &o) {
       o.upvotes.push_back(author);
     });
   }
@@ -232,13 +292,13 @@ public:
   /// @abi action
   void downvote(proposal_id_t proposal_id, account_name author)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_delegate(author);
     // TODO: assert(author is delegate)
     eosio_assert(!contains(proposal->upvotes, author), "author has already downvoted");
 
-    _proposals.modify(proposal, author, [&](auto &o) {
+    get_proposals().modify(proposal, author, [&](auto &o) {
       o.downvotes.push_back(author);
     });
   }
@@ -260,11 +320,11 @@ public:
   /// @abi action
   void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, account_name author, string text)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_member(author);
 
-    _proposals.modify(proposal, author, [&](auto &o) {
+    get_proposals().modify(proposal, author, [&](auto &o) {
       comment_t comment;
       comment.id = comment_id;
       comment.text = text;
@@ -279,13 +339,13 @@ public:
   /// @abi action
   void editcomment(proposal_id_t proposal_id, comment_id_t comment_id, string text)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     const auto comment = getcomment(*proposal, comment_id);
     eosio_assert(comment != proposal->comments.end(), "comment doesn't exist");
     require_app_member(comment->author);
 
-    _proposals.modify(proposal, proposal->author, [&](auto &o) {
+    get_proposals().modify(proposal, proposal->author, [&](auto &o) {
       auto comment = getcomment(o, comment_id);
       comment->text = text;
       comment->modified = block_timestamp(now());
@@ -295,14 +355,14 @@ public:
   /// @abi action
   void delcomment(proposal_id_t proposal_id, comment_id_t comment_id)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
     const auto comment = getcomment(*proposal, comment_id);
     eosio_assert(comment != proposal->comments.end(), "comment doesn't exist");
     require_app_member(comment->author);
 
-    _proposals.modify(proposal, proposal->author, [&](auto &proposal) {
+    get_proposals().modify(proposal, proposal->author, [&](auto &proposal) {
       proposal.comments.erase(getcomment(proposal, comment_id));
     });
   }
@@ -325,13 +385,13 @@ public:
   void
   addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, string text)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
     eosio_assert(gettspec(*proposal, tspec_id) == proposal->tspecs.end(),
                  "technical specification is already exists with the same id");
 
-    _proposals.modify(proposal, author, [&](auto &o) {
+    get_proposals().modify(proposal, author, [&](auto &o) {
       tspec_t spec;
       spec.id = tspec_id;
       spec.author = author;
@@ -345,13 +405,13 @@ public:
   /// @abi action
   void edittspec(proposal_id_t proposal_id, tspec_id_t tspec_id, string text)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     const auto tspec = gettspec(*proposal, tspec_id);
     eosio_assert(tspec != proposal->tspecs.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
-    _proposals.modify(proposal, tspec->author, [&](auto &o) {
+    get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_id);
       tspec->text = text;
     });
@@ -360,13 +420,13 @@ public:
   /// @abi action
   void deltspec(proposal_id_t proposal_id, tspec_id_t tspec_id)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     auto tspec = gettspec(*proposal, tspec_id);
     eosio_assert(tspec != proposal->tspecs.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
-    _proposals.modify(proposal, tspec->author, [&](auto &o) {
+    get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       o.tspecs.erase(gettspec(o, tspec_id));
     });
   }
@@ -374,8 +434,8 @@ public:
   /// @abi action
   void uvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, string comment)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     const auto tspec = gettspec(*proposal, tspec_id);
     eosio_assert(tspec != proposal->tspecs.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
@@ -389,7 +449,7 @@ public:
                    return o.author == author;
                  }) == tspec->downvotes.end(),
                  "user has been already voted");
-    _proposals.modify(proposal, tspec->author, [&](auto &o) {
+    get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_id);
       tspec->upvotes.push_back(tspec_vote_t{author, comment});
     });
@@ -398,8 +458,8 @@ public:
   /// @abi action
   void dvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, string comment)
   {
-    auto proposal = _proposals.find(proposal_id);
-    eosio_assert(proposal != _proposals.end(), "proposal has not been found");
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     const auto tspec = gettspec(*proposal, tspec_id);
     eosio_assert(tspec != proposal->tspecs.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
@@ -414,38 +474,47 @@ public:
                  }) == tspec->downvotes.end(),
                  "user has been already voted");
 
-    _proposals.modify(proposal, tspec->author, [&](auto &o) {
+    get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_id);
       tspec->downvotes.push_back(tspec_vote_t{author, comment});
     });
   }
 
-
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
   /// @abi action
-  void transfer(uint64_t code /* code == golos.token */)
+  void transfer(currency::transfer &t)
   {
-    auto data = unpack_action_data<currency::transfer>();
-    LOG("transfer % from \"%\" to \"%\"", data.quantity.amount, name{data.from}.to_string().c_str(), name{data.to}.to_string().c_str());
+    init(eosio::string_to_name(t.memo.c_str()));
+    LOG("transfer % from \"%\" to \"%\"", t.quantity.amount, name{t.from}.to_string().c_str(), name{t.to}.to_string().c_str());
 
-    if (data.from == _self || data.to != _self)
+    if (t.to != _self)
+    {
+      LOG("transfer from a wrong token");
       return;
+    }
 
-  /**
-   struct transfer
-     {
-        account_name from;
-        account_name to;
-        asset        quantity;
-        string       memo;
+    eosio_assert(t.quantity.is_valid(), "Quntity is invalid");
+    eosio_assert(t.quantity.amount > 0, "Invalid transfer amount");
 
-        EOSLIB_SERIALIZE( transfer, (from)(to)(quantity)(memo) )
-      };
-    */
-    eosio_assert(data.quantity.is_valid(), "Quntity is invalid");
-    eosio_assert(data.quantity.amount > 0, "Invalid transfer amount");
+    const account_name &payer = t.to;
+
+    auto fund = get_funds().find(t.from);
+    if (fund == get_funds().end())
+    {
+      get_funds().emplace(payer, [&](auto &fund) {
+        fund.owner = t.from;
+        fund.quantity = t.quantity;
+      });
+    }
+    else
+    {
+      get_funds().modify(fund, payer, [&](auto &fund) {
+        eosio_assert(fund.owner == t.from, "invalid fund owner");
+        fund.quantity += t.quantity;
+      });
+    }
   }
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos)(editpropos)(delpropos)(upvote)(downvote)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(uvotetspec)(dvotetspec))
+APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos)(editpropos)(delpropos)(upvote)(downvote)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(uvotetspec)(dvotetspec), (transfer))

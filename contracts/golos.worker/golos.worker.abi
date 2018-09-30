@@ -124,6 +124,17 @@
         }
       ]
     },{
+      "name": "fund_t",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        },{
+          "name": "quantity",
+          "type": "asset"
+        }
+      ]
+    },{
       "name": "createpool",
       "base": "",
       "fields": [
@@ -438,7 +449,7 @@
         "uint64"
       ],
       "type": "proposal_t"
-  }, {
+  },{
       "name": "states",
       "index_type": "i64",
       "key_names": [
@@ -448,6 +459,16 @@
         "uint64"
       ],
       "type": "state_t"
+  },{
+      "name": "funds",
+      "index_type": "i64",
+      "key_names": [
+        "owner"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "fund_t"
   }],
   "ricardian_clauses": [],
   "error_messages": [],
