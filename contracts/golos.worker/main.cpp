@@ -117,6 +117,38 @@ public:
     block_timestamp development_eta;
     uint8_t payments_count;
 
+    void update(const tspec_data_t &that)
+    {
+      if (!that.text.empty())
+      {
+        text = that.text;
+      }
+      if (that.specification_cost.amount != 0)
+      {
+        specification_cost = that.specification_cost;
+      }
+
+      if (that.specification_eta != TIMESTAMP_UNDEFINED)
+      {
+        specification_eta = that.specification_eta;
+      }
+
+      if (that.development_cost.amount != 0)
+      {
+        development_cost = that.development_cost;
+      }
+
+      if (that.development_eta != TIMESTAMP_UNDEFINED)
+      {
+        development_eta = that.development_eta;
+      }
+
+      if (that.payments_count != 0)
+      {
+        payments_count = that.payments_count;
+      }
+    }
+
     EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
   };
 
@@ -176,41 +208,10 @@ public:
     tspec_app_t() : created(TIMESTAMP_NOW) {}
     tspec_app_t(tspec_app_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
 
-    void update(const tspec_data_t &that)
-    {
-      if (!that.text.empty())
-      {
-        data.text = that.text;
-      }
-      if (that.specification_cost.amount != 0)
-      {
-        data.specification_cost = that.specification_cost;
-      }
-
-      if (that.specification_eta != TIMESTAMP_UNDEFINED)
-      {
-        data.specification_eta = that.specification_eta;
-      }
-
-      if (that.development_cost.amount != 0)
-      {
-        data.development_cost = that.development_cost;
-      }
-
-      if (that.development_eta != TIMESTAMP_UNDEFINED)
-      {
-        data.development_eta = that.development_eta;
-      }
-
-      if (that.payments_count != 0)
-      {
-        data.payments_count = that.payments_count;
-      }
-    }
 
     void modify(const tspec_data_t &that)
     {
-      update(that);
+      data.update(that);
       modified = TIMESTAMP_NOW;
     }
   };
@@ -220,7 +221,7 @@ public:
   struct proposal_t
   {
 
-    enum state
+    enum state_t
     {
       STATE_TSPEC_APP,
       STATE_TSPEC_CREATE,
@@ -236,13 +237,25 @@ public:
     voting_module_t votes;
     comments_module_t comments;
 
+    // technical specification applications
     vector<tspec_app_t> tspec_apps;
+
+    ///< technical specification author
+    account_name tspec_author;
+    ///< technical specification data
+    tspec_data_t tspec;
+    ///< perpetrator account name
+    account_name worker;
 
     block_timestamp created;
     block_timestamp modified;
     state_t state;
 
     uint64_t primary_key() const { return id; }
+
+    void set_state(state_t new_state) {
+      state = new_state;
+    }
 
     EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(created)(modified)(state));
   };
@@ -324,6 +337,12 @@ protected:
   {
     eosio_assert(_proposals != nullptr, "contract is not initialized");
     return *_proposals;
+  }
+
+  const auto get_proposal(proposal_id_t proposal_id) {
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
+    return proposal;
   }
 
   funds_t &get_funds()
@@ -499,7 +518,7 @@ public:
 
     get_proposals().modify(proposal, author, [&](auto &o) {
       tspec_app_t spec(tspec_id, author);
-      spec.update(data);
+      spec.data.update(data);
       o.tspec_apps.push_back(spec);
     });
   }
@@ -550,9 +569,11 @@ public:
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.upvote(author);
-    });
 
-    if (tspec->votes.upvotes.size()
+      if (tspec->votes.upvotes.size() >= witness_count_51) {
+
+      }
+    });
   }
 
   /// @abi action
@@ -568,6 +589,48 @@ public:
       auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.downvote(author);
     });
+  }
+
+  /// @abi action
+  void settspec(proposal_id_t proposal_id, const tspec_data_t &data) {
+    auto proposalIt = get_proposal(proposal_id);
+    eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
+
+    get_proposals().modify(proposalIt, proposalIt->tspec_author, [&](proposal_t &proposal) {
+      proposal.tspec.update(data);
+      proposal.set_state(proposal_t::STATE_TSPEC_WORK);
+    });
+  }
+
+  void setworker(proposal_id_t proposal_id, account_name worker) {
+    auto proposalIt = get_proposal(proposal_id);
+    eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
+
+    get_proposals().modify(proposalIt, proposalIt->tspec_author, [&](proposal_t &proposal) {
+      proposal.worker = worker;
+      proposal.set_state(proposal_t::STATE_TSPEC_WORK);
+    });
+  }
+
+  /// @abi action
+  void cancel(proposal_id_t proposal_id, account_name delegate) {
+    auto proposalIt = get_proposal(proposal_id);
+    eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_WORK, "invalid proposal state");
+
+  }
+
+  /// @abi action
+  void acceptwork(proposal_id_t proposal_id, account_name tspec_author) {
+    auto proposalIt = get_proposal(proposal_id);
+    eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_WORK, "invalid proposal state");
+
+  }
+
+  /// @abi action
+  void approvework(proposal_id_t proposal_id, account_name delegate) {
+    require_app_delegate(delegate);
+    auto proposalIt = get_proposal(proposal_id);
+
   }
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
