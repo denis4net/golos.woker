@@ -8,7 +8,8 @@
 #include <vector>
 #include <algorithm>
 
-#include "token.hpp"
+#include "structs.hpp"
+
 #include "app_dispatcher.hpp"
 
 using namespace eosio;
@@ -36,27 +37,74 @@ public:
   typedef symbol_name app_domain_t;
 
   typedef uint64_t comment_id_t;
+
+  struct comment_data_t
+  {
+    string text;
+
+    EOSLIB_SERIALIZE(comment_data_t, (text));
+  };
+
   struct comment_t
   {
     comment_id_t id;
-    comment_id_t parent;
-    string text;
     account_name author;
+    comment_data_t data;
     block_timestamp created;
     block_timestamp modified;
-    EOSLIB_SERIALIZE(comment_t, (id)(parent)(text)(author)(created)(modified));
+
+    EOSLIB_SERIALIZE(comment_t, (id)(author)(data)(created)(modified));
+  };
+
+  struct comments_module_t
+  {
+    vector<comment_t> comments;
+
+    void add(comment_id_t id, account_name author, const comment_data_t &data)
+    {
+      eosio_assert(std::find_if(comments.begin(), comments.end(), [&](const comment_t &comment) {
+        return comment.id == id;
+      }) == comments.end(), "comment with the same id is already exists");
+
+      comment_t comment {
+        .id = id,
+        .author = author,
+        .data = data,
+        .created = TIMESTAMP_NOW,
+        .modified = TIMESTAMP_UNDEFINED
+      };
+
+      comments.push_back(comment);
+    }
+
+    auto lookup(comment_id_t id) {
+        return std::find_if(comments.begin(), comments.end(), [&](auto &o) {
+          return o.id == id;
+        });
+    }
+
+    void del(comment_id_t id) {
+      auto comment = lookup(id);
+      eosio_assert(comment != comments.end(), "comment doens't exist");
+      require_auth(comment->author);
+      comments.erase(comment);
+    }
+
+    void edit(comment_id_t id, const comment_data_t &data) {
+      auto comment = lookup(id);
+      eosio_assert(comment != comments.end(), "comment doesn't exist");
+      if (!data.text.empty()) {
+        comment->data.text = data.text;
+      }
+    }
+
+    EOSLIB_SERIALIZE(comments_module_t, (comments));
   };
 
   typedef uint64_t tspec_bid_id_t;
 
-  struct tspec_bid_vote_t
+  struct tspec_data_t
   {
-    account_name author;
-    string comment;
-    EOSLIB_SERIALIZE(tspec_bid_vote_t, (author)(comment));
-  };
-
-  struct tspec_data_t {
     string text;
     asset specification_cost;
     block_timestamp specification_eta;
@@ -67,6 +115,45 @@ public:
     EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
   };
 
+
+  struct voting_module_t
+  {
+    set_t<account_name> upvotes;
+    set_t<account_name> downvotes;
+
+    bool upvoted(account_name voter)
+    {
+      return upvotes.has(voter);
+    }
+
+    bool downvoted(account_name voter)
+    {
+      return downvotes.has(voter);
+    }
+
+    void upvote(account_name voter)
+    {
+      eosio_assert(!upvotes.has(voter), "already upvoted");
+      eosio_assert(!downvotes.has(voter), "already downvoted");
+      upvotes.set(voter);
+    }
+
+    void downvote(account_name voter)
+    {
+      eosio_assert(!upvotes.has(voter), "already upvoted");
+      eosio_assert(!downvotes.has(voter), "already downvoted");
+      downvotes.set(voter);
+    }
+
+    void delvote(account_name voter)
+    {
+      upvotes.unset(voter);
+      downvotes.unset(voter);
+    }
+
+    EOSLIB_SERIALIZE(voting_module_t, (upvotes)(downvotes));
+  };
+
   struct tspec_bid_t
   {
     tspec_bid_id_t id;
@@ -74,13 +161,13 @@ public:
 
     tspec_data_t data;
 
-    vector<tspec_bid_vote_t> upvotes;
-    vector<tspec_bid_vote_t> downvotes;
+    voting_module_t votes;
+    comments_module_t comments;
 
     block_timestamp created;
     block_timestamp modified;
 
-    EOSLIB_SERIALIZE(tspec_bid_t, (id)(author)(data)(upvotes)(downvotes)(created)(modified));
+    EOSLIB_SERIALIZE(tspec_bid_t, (id)(author)(data)(votes)(created)(modified));
 
     tspec_bid_t() : created(TIMESTAMP_NOW) {}
     tspec_bid_t(tspec_bid_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
@@ -132,15 +219,16 @@ public:
     account_name author;
     string title;
     string description;
-    vector<account_name> upvotes;
-    vector<account_name> downvotes;
-    vector<comment_t> comments;
+
+    voting_module_t votes;
+    comments_module_t comments;
+
     vector<tspec_bid_t> tspec_bids;
+
     block_timestamp created;
     block_timestamp modified;
     uint64_t primary_key() const { return id; }
 
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(upvotes)(downvotes)(comments)(tspec_bids)(created)(modified));
   };
 
   typedef multi_index<N(proposals), proposal_t> proposals_t;
@@ -306,7 +394,7 @@ public:
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
-    eosio_assert(proposal->upvotes.size() == 0, "proposal has been approved by one member");
+    eosio_assert(proposal->votes.upvotes.size() == 0, "proposal has been approved by one member");
     require_app_member(proposal->author);
     get_proposals().erase(proposal);
   }
@@ -317,10 +405,9 @@ public:
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_delegate(author);
-    // TODO: assert(author is delegate)
-    eosio_assert(!contains(proposal->downvotes, author), "author has already downvoted");
+
     get_proposals().modify(proposal, author, [&](auto &o) {
-      o.upvotes.push_back(author);
+      o.votes.upvote(author);
     });
   }
 
@@ -330,60 +417,32 @@ public:
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_delegate(author);
-    // TODO: assert(author is delegate)
-    eosio_assert(!contains(proposal->upvotes, author), "author has already downvoted");
 
     get_proposals().modify(proposal, author, [&](auto &o) {
-      o.downvotes.push_back(author);
-    });
-  }
-
-  const auto getcomment(const proposal_t &proposal, comment_id_t comment_id)
-  {
-    return std::find_if(proposal.comments.begin(), proposal.comments.end(), [&](const auto &o) {
-      return o.id == comment_id;
-    });
-  }
-
-  auto getcomment(proposal_t &proposal, comment_id_t comment_id)
-  {
-    return std::find_if(proposal.comments.begin(), proposal.comments.end(), [&](auto &o) {
-      return o.id == comment_id;
+      o.votes.downvote(author);
     });
   }
 
   /// @abi action
-  void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, account_name author, string text)
+  void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, account_name author, const comment_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     require_app_member(author);
 
-    get_proposals().modify(proposal, author, [&](auto &o) {
-      comment_t comment;
-      comment.id = comment_id;
-      comment.text = text;
-      comment.author = author;
-      comment.created = block_timestamp(now());
-      comment.modified = block_timestamp(0);
-
-      o.comments.push_back(comment);
+    get_proposals().modify(proposal, author, [&](auto &proposal) {
+      proposal.comments.add(comment_id, author, data);
     });
   }
 
   /// @abi action
-  void editcomment(proposal_id_t proposal_id, comment_id_t comment_id, string text)
+  void editcomment(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
-    const auto comment = getcomment(*proposal, comment_id);
-    eosio_assert(comment != proposal->comments.end(), "comment doesn't exist");
-    require_app_member(comment->author);
 
-    get_proposals().modify(proposal, proposal->author, [&](auto &o) {
-      auto comment = getcomment(o, comment_id);
-      comment->text = text;
-      comment->modified = block_timestamp(now());
+    get_proposals().modify(proposal, proposal->author, [&](auto &proposal) {
+      proposal.comments.edit(comment_id, data);
     });
   }
 
@@ -393,12 +452,8 @@ public:
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
-    const auto comment = getcomment(*proposal, comment_id);
-    eosio_assert(comment != proposal->comments.end(), "comment doesn't exist");
-    require_app_member(comment->author);
-
     get_proposals().modify(proposal, proposal->author, [&](auto &proposal) {
-      proposal.comments.erase(getcomment(proposal, comment_id));
+      proposal.comments.del(comment_id);
     });
   }
 
@@ -422,7 +477,7 @@ public:
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
-    const auto tspec = gettspec(*proposal, tspec_id) ;
+    const auto tspec = gettspec(*proposal, tspec_id);
     eosio_assert(tspec == proposal->tspec_bids.end(),
                  "technical specification is already exists with the same id");
 
@@ -459,7 +514,7 @@ public:
     auto tspec = gettspec(*proposal, tspec_bid_id);
     eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
-    eosio_assert(tspec->upvotes.empty(), "technical specification bid can't be deleted because it already has been upvoted"); //Technical Specification 1.e
+    eosio_assert(tspec->votes.upvotes.empty(), "technical specification bid can't be deleted because it already has been upvoted"); //Technical Specification 1.e
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       o.tspec_bids.erase(gettspec(o, tspec_bid_id));
@@ -471,22 +526,14 @@ public:
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
+
     const auto tspec = gettspec(*proposal, tspec_bid_id);
     eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
-    eosio_assert(std::find_if(tspec->upvotes.begin(), tspec->upvotes.end(), [&](auto &o) {
-                   return o.author == author;
-                 }) == tspec->upvotes.end(),
-                 "user has been already voted");
-
-    eosio_assert(std::find_if(tspec->downvotes.begin(), tspec->downvotes.end(), [&](auto &o) {
-                   return o.author == author;
-                 }) == tspec->downvotes.end(),
-                 "user has been already voted");
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_bid_id);
-      tspec->upvotes.push_back(tspec_bid_vote_t{author, comment});
+      tspec->votes.upvote(author);
     });
   }
 
@@ -499,19 +546,9 @@ public:
     eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
-    eosio_assert(std::find_if(tspec->upvotes.begin(), tspec->upvotes.end(), [&](auto &o) {
-                   return o.author == author;
-                 }) == tspec->upvotes.end(),
-                 "user has been already voted");
-
-    eosio_assert(std::find_if(tspec->downvotes.begin(), tspec->downvotes.end(), [&](auto &o) {
-                   return o.author == author;
-                 }) == tspec->downvotes.end(),
-                 "user has been already voted");
-
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_bid_id);
-      tspec->downvotes.push_back(tspec_bid_vote_t{author, comment});
+      tspec->votes.downvote(author);
     });
   }
 
