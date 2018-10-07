@@ -8,6 +8,7 @@
 #include <vector>
 #include <algorithm>
 
+#include "external.hpp"
 #include "structs.hpp"
 
 #include "app_dispatcher.hpp"
@@ -63,37 +64,41 @@ public:
     void add(comment_id_t id, account_name author, const comment_data_t &data)
     {
       eosio_assert(std::find_if(comments.begin(), comments.end(), [&](const comment_t &comment) {
-        return comment.id == id;
-      }) == comments.end(), "comment with the same id is already exists");
+                     return comment.id == id;
+                   }) == comments.end(),
+                   "comment with the same id is already exists");
 
-      comment_t comment {
-        .id = id,
-        .author = author,
-        .data = data,
-        .created = TIMESTAMP_NOW,
-        .modified = TIMESTAMP_UNDEFINED
-      };
+      comment_t comment{
+          .id = id,
+          .author = author,
+          .data = data,
+          .created = TIMESTAMP_NOW,
+          .modified = TIMESTAMP_UNDEFINED};
 
       comments.push_back(comment);
     }
 
-    auto lookup(comment_id_t id) {
-        return std::find_if(comments.begin(), comments.end(), [&](auto &o) {
-          return o.id == id;
-        });
+    auto lookup(comment_id_t id)
+    {
+      return std::find_if(comments.begin(), comments.end(), [&](auto &o) {
+        return o.id == id;
+      });
     }
 
-    void del(comment_id_t id) {
+    void del(comment_id_t id)
+    {
       auto comment = lookup(id);
       eosio_assert(comment != comments.end(), "comment doens't exist");
       require_auth(comment->author);
       comments.erase(comment);
     }
 
-    void edit(comment_id_t id, const comment_data_t &data) {
+    void edit(comment_id_t id, const comment_data_t &data)
+    {
       auto comment = lookup(id);
       eosio_assert(comment != comments.end(), "comment doesn't exist");
-      if (!data.text.empty()) {
+      if (!data.text.empty())
+      {
         comment->data.text = data.text;
       }
     }
@@ -101,7 +106,7 @@ public:
     EOSLIB_SERIALIZE(comments_module_t, (comments));
   };
 
-  typedef uint64_t tspec_bid_id_t;
+  typedef uint64_t tspec_app_id_t;
 
   struct tspec_data_t
   {
@@ -114,7 +119,6 @@ public:
 
     EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
   };
-
 
   struct voting_module_t
   {
@@ -154,9 +158,9 @@ public:
     EOSLIB_SERIALIZE(voting_module_t, (upvotes)(downvotes));
   };
 
-  struct tspec_bid_t
+  struct tspec_app_t
   {
-    tspec_bid_id_t id;
+    tspec_app_id_t id;
     account_name author;
 
     tspec_data_t data;
@@ -167,10 +171,10 @@ public:
     block_timestamp created;
     block_timestamp modified;
 
-    EOSLIB_SERIALIZE(tspec_bid_t, (id)(author)(data)(votes)(created)(modified));
+    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(created)(modified));
 
-    tspec_bid_t() : created(TIMESTAMP_NOW) {}
-    tspec_bid_t(tspec_bid_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
+    tspec_app_t() : created(TIMESTAMP_NOW) {}
+    tspec_app_t(tspec_app_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
 
     void update(const tspec_data_t &that)
     {
@@ -215,6 +219,15 @@ public:
   //@abi table proposals i64
   struct proposal_t
   {
+
+    enum state
+    {
+      STATE_TSPEC_APP,
+      STATE_TSPEC_CREATE,
+      STATE_TSPEC_WORK,
+      STATE_TSPEC_FINISHED
+    };
+
     proposal_id_t id;
     account_name author;
     string title;
@@ -223,12 +236,15 @@ public:
     voting_module_t votes;
     comments_module_t comments;
 
-    vector<tspec_bid_t> tspec_bids;
+    vector<tspec_app_t> tspec_apps;
 
     block_timestamp created;
     block_timestamp modified;
+    state_t state;
+
     uint64_t primary_key() const { return id; }
 
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(created)(modified)(state));
   };
 
   typedef multi_index<N(proposals), proposal_t> proposals_t;
@@ -457,97 +473,99 @@ public:
     });
   }
 
-  inline auto gettspec(proposal_t &proposal, tspec_bid_id_t tspec_bid_id)
+  inline auto gettspec(proposal_t &proposal, tspec_app_id_t tspec_app_id)
   {
-    return std::find_if(proposal.tspec_bids.begin(), proposal.tspec_bids.end(), [&](const auto &o) {
-      return o.id == tspec_bid_id;
+    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
+      return o.id == tspec_app_id;
     });
   }
 
-  inline const auto gettspec(const proposal_t &proposal, tspec_bid_id_t tspec_bid_id)
+  inline const auto gettspec(const proposal_t &proposal, tspec_app_id_t tspec_app_id)
   {
-    return std::find_if(proposal.tspec_bids.begin(), proposal.tspec_bids.end(), [&](const auto &o) {
-      return o.id == tspec_bid_id;
+    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
+      return o.id == tspec_app_id;
     });
   }
 
   /// @abi action
-  void addtspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_id, account_name author, const tspec_data_t &data)
+  void addtspec(proposal_id_t proposal_id, tspec_app_id_t tspec_id, account_name author, const tspec_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
     const auto tspec = gettspec(*proposal, tspec_id);
-    eosio_assert(tspec == proposal->tspec_bids.end(),
+    eosio_assert(tspec == proposal->tspec_apps.end(),
                  "technical specification is already exists with the same id");
 
     get_proposals().modify(proposal, author, [&](auto &o) {
-      tspec_bid_t spec(tspec_id, author);
+      tspec_app_t spec(tspec_id, author);
       spec.update(data);
-      o.tspec_bids.push_back(spec);
+      o.tspec_apps.push_back(spec);
     });
   }
 
   /// @abi action
-  void edittspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, const tspec_data_t &that)
+  void edittspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id, account_name author, const tspec_data_t &that)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
-    const auto tspec = gettspec(*proposal, tspec_bid_id);
-    eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
+    const auto tspec = gettspec(*proposal, tspec_app_id);
+    eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     eosio_assert(that.specification_cost.symbol == get_state()->token_symbol, "invalid token symbol");
     eosio_assert(that.development_cost.symbol == get_state()->token_symbol, "invalid token symbol");
 
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      auto tspec = gettspec(o, tspec_bid_id);
+      auto tspec = gettspec(o, tspec_app_id);
       tspec->modify(that);
     });
   }
 
   /// @abi action
-  void deltspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id)
+  void deltspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
-    auto tspec = gettspec(*proposal, tspec_bid_id);
-    eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
+    auto tspec = gettspec(*proposal, tspec_app_id);
+    eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
     eosio_assert(tspec->votes.upvotes.empty(), "technical specification bid can't be deleted because it already has been upvoted"); //Technical Specification 1.e
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      o.tspec_bids.erase(gettspec(o, tspec_bid_id));
+      o.tspec_apps.erase(gettspec(o, tspec_app_id));
     });
   }
 
   /// @abi action
-  void uvotetspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, string comment)
+  void uvotetspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id, account_name author, string comment)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
-    const auto tspec = gettspec(*proposal, tspec_bid_id);
-    eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
+    const auto tspec = gettspec(*proposal, tspec_app_id);
+    eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      auto tspec = gettspec(o, tspec_bid_id);
+      auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.upvote(author);
     });
+
+    if (tspec->votes.upvotes.size()
   }
 
   /// @abi action
-  void dvotetspec(proposal_id_t proposal_id, tspec_bid_id_t tspec_bid_id, account_name author, string comment)
+  void dvotetspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id, account_name author, string comment)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
-    const auto tspec = gettspec(*proposal, tspec_bid_id);
-    eosio_assert(tspec != proposal->tspec_bids.end(), "technical specification doesn't exist");
+    const auto tspec = gettspec(*proposal, tspec_app_id);
+    eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      auto tspec = gettspec(o, tspec_bid_id);
+      auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.downvote(author);
     });
   }

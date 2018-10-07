@@ -7,7 +7,7 @@
       "new_type_name": "comment_id_t",
       "type": "uint64"
     },{
-      "new_type_name": "tspec_bid_id_t",
+      "new_type_name": "tspec_app_id_t",
       "type": "uint64"
     },{
       "new_type_name": "account_name",
@@ -41,7 +41,7 @@
         }
       ]
     },{
-      "name": "tspec_bid_vote_t",
+      "name": "tspec_app_vote_t",
       "base": "",
       "fields": [{
           "name": "author",
@@ -75,7 +75,7 @@
         }
       ]
     },{
-      "name": "tspec_bid_t",
+      "name": "tspec_app_t",
       "base": "",
       "fields": [{
           "name": "id",
@@ -88,10 +88,10 @@
           "type": "tspec_data_t"
         },{
           "name": "upvotes",
-          "type": "tspec_bid_vote_t[]"
+          "type": "tspec_app_vote_t[]"
         },{
           "name": "downvotes",
-          "type": "tspec_bid_vote_t[]"
+          "type": "tspec_app_vote_t[]"
         },{
           "name": "created",
           "type": "block_timestamp"
@@ -125,8 +125,8 @@
           "name": "comments",
           "type": "comment_t[]"
         },{
-          "name": "tspec_bids",
-          "type": "tspec_bid_t[]"
+          "name": "tspec_apps",
+          "type": "tspec_app_t[]"
         },{
           "name": "created",
           "type": "block_timestamp"
@@ -303,8 +303,8 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
-          "name": "tspec_bid_id",
-          "type": "tspec_bid_id_t"
+          "name": "tspec_app_id",
+          "type": "tspec_app_id_t"
         },{
           "name": "author",
           "type": "name"
@@ -323,8 +323,8 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
-          "name": "tspec_bid_id",
-          "type": "tspec_bid_id_t"
+          "name": "tspec_app_id",
+          "type": "tspec_app_id_t"
         },{
           "name": "data",
           "type": "tspec_data_t"
@@ -341,7 +341,7 @@
           "type": "proposal_id_t"
         },{
           "name": "task_id",
-          "type": "tspec_bid_id_t"
+          "type": "tspec_app_id_t"
         }
       ]
     },{
@@ -354,8 +354,8 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
-          "name": "tspec_bid_id",
-          "type": "tspec_bid_id_t"
+          "name": "tspec_app_id",
+          "type": "tspec_app_id_t"
         },{
           "name": "autrhor",
           "type": "name"
@@ -374,8 +374,8 @@
           "name": "proposal_id",
           "type": "proposal_id_t"
         },{
-          "name": "tspec_bid_id",
-          "type": "tspec_bid_id_t"
+          "name": "tspec_app_id",
+          "type": "tspec_app_id_t"
         },{
           "name": "autrhor",
           "type": "name"
