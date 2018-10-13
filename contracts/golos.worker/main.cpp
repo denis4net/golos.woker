@@ -230,6 +230,9 @@ public:
 
     proposal_id_t id;
     account_name author;
+    account_name fund;
+    asset budget;
+
     string title;
     string description;
     voting_module_t votes;
@@ -242,11 +245,12 @@ public:
     tspec_data_t tspec;
     ///< perpetrator account name
     account_name worker;
+
     block_timestamp created;
     block_timestamp modified;
     uint8_t state;
 
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(created)(modified)(state));
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(fund)(budget)(title)(description)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(created)(modified)(state));
 
     uint64_t primary_key() const { return id; }
 
@@ -377,6 +381,26 @@ public:
       o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
     });
     LOG("added");
+  }
+
+  void setproposfund(proposal_id_t proposal_id, account_name fund_name, asset quantity)
+  {
+    auto proposal = get_proposals().find(proposal_id);
+    eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
+    require_app_member(fund_name);
+
+    auto fund = get_funds().find(fund_name);
+    eosio_assert(fund != get_funds().end(), "fund has not been found");
+    eosio_assert(fund->quantity >= quantity, "insufficient funds");
+
+    get_proposals().modify(proposal, fund_name, [&](auto &o) {
+      o.fund = fund_name;
+      o.budget = quantity;
+    });
+
+    get_funds().modify(fund, fund_name, [&](auto &fund) {
+      fund.quantity -= quantity;
+    });
   }
 
   // @abi action

@@ -68,6 +68,8 @@
       "fields": [
         { "name": "id", "type": "proposal_id_t" },
         { "name": "author", "type": "name" },
+        { "name": "fund", "type": "name" },
+        { "name": "budget", "type": "asset" },
         { "name": "title", "type": "string" },
         { "name": "description", "type": "string" },
         { "name": "votes", "type": "voting_module_t" },
@@ -131,6 +133,28 @@
         {
           "name": "description",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "setproposfund",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "fund_name",
+          "type": "name"
+        },
+        {
+          "name": "quantity",
+          "type": "asset"
         }
       ]
     },
