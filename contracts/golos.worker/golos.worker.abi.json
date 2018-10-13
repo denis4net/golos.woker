@@ -379,40 +379,14 @@
           "type": "tspec_id_t"
         },
         {
-          "name": "autrhor",
-          "type": "name"
-        },
-        {
-          "name": "comment_id",
-          "type": "comment_id_t"
-        },
-        {
-          "name": "comment",
-          "type": "comment_data_t"
-        }
-      ]
-    },
-    {
-      "name": "dvotetspec",
-      "base": "",
-      "fields": [
-        {
-          "name": "app_domain",
-          "type": "name"
-        },
-        {
-          "name": "proposal_id",
-          "type": "proposal_id_t"
-        },
-        {
-          "name": "tspec_app_id",
-          "type": "tspec_id_t"
-        },
-        {
           "name": "author",
           "type": "name"
         },
         {
+          "name": "vote",
+          "type": "uint8"
+        },
+        {
           "name": "comment_id",
           "type": "comment_id_t"
         },
@@ -422,6 +396,7 @@
         }
       ]
     },
+
     {
       "name": "transfer",
       "base": "",
@@ -501,11 +476,6 @@
     {
       "name": "uvotetspec",
       "type": "uvotetspec",
-      "ricardian_contract": ""
-    },
-    {
-      "name": "dvotetspec",
-      "type": "dvotetspec",
       "ricardian_contract": ""
     },
     {
