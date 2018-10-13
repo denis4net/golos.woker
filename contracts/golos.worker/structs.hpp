@@ -13,14 +13,18 @@
     return ds >> static_cast<BASE&>(t); \
  }
 
+namespace golos {
+
+using std::vector;
+
 template <typename T>
-class set_t : public std::vector<T>
+class set_t : public vector<T>
 {
   public:
-    using std::vector<T>::end;
-    using std::vector<T>::begin;
-    using std::vector<T>::erase;
-    using std::vector<T>::push_back;
+    using vector<T>::end;
+    using vector<T>::begin;
+    using vector<T>::erase;
+    using vector<T>::push_back;
 
     bool has(const T &v) const
     {
@@ -43,5 +47,13 @@ class set_t : public std::vector<T>
         return false;
     }
 
-    EOSLIB_SERIALIZE_DERIVED2(set_t, std::vector<T>);
+    EOSLIB_SERIALIZE_DERIVED2(set_t, vector<T>);
 };
+
+template <typename T>
+bool contains(vector<T> c, const T &v)
+{
+  return std::find(c.begin(), c.end(), v) != c.end();
+}
+
+}
