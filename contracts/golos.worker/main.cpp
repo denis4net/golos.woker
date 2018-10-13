@@ -668,8 +668,6 @@ public:
     require_app_delegate(author);
     eosio_assert(voting_time_s + tspec_ptr->created.to_time_point().sec_since_epoch() <= now(), "voting time is over");
 
-
-
     get_proposals().modify(proposal_ptr, tspec_ptr->author, [&](auto &o) {
       auto tspec = get_tspec(o, tspec_app_id);
       tspec->votes.vote(author, static_cast<voting_module_t::vote_value_t>(vote));
@@ -717,6 +715,24 @@ public:
       proposal.work_begining_time = TIMESTAMP_NOW;
       proposal.set_state(proposal_t::STATE_WORK);
     });
+  }
+
+  void cancelwork(proposal_id_t proposal_id, account_name initiator) {
+      auto proposal_ptr = get_proposal(proposal_id);
+      eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
+      eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+
+      if (initiator == proposal_ptr->worker) {
+        require_auth(proposal_ptr->worker);
+      } else {
+          require_auth(proposal_ptr->tspec_author);
+      }
+
+      get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
+          refund(proposal);
+          close(proposal);
+          proposal.set_state(proposal_t::STATE_CLOSED);
+      });
   }
 
   void finishwork(proposal_id_t proposal_id)
@@ -831,5 +847,5 @@ APP_DOMAIN_ABI(golos::worker, (createpool)\
                (addpropos)(editpropos)(delpropos)(votepropos)\
                (addcomment)(editcomment)(delcomment)\
                (addtspec)(edittspec)(deltspec)(votetspec)(settspec)\
-               (startwork)(finishwork)(acceptwork)(reviewwork),\
+               (startwork)(finishwork)(acceptwork)(reviewwork)(cancelwork),\
                (transfer))
