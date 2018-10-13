@@ -102,11 +102,9 @@ public:
         comment->data.text = data.text;
       }
     }
-
-    EOSLIB_SERIALIZE(comments_module_t, (comments));
   };
 
-  typedef uint64_t tspec_app_id_t;
+  typedef uint64_t tspec_id_t;
 
   struct tspec_data_t
   {
@@ -192,7 +190,7 @@ public:
 
   struct tspec_app_t
   {
-    tspec_app_id_t id;
+    tspec_id_t id;
     account_name author;
 
     tspec_data_t data;
@@ -203,10 +201,8 @@ public:
     block_timestamp created;
     block_timestamp modified;
 
-    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(created)(modified));
-
     tspec_app_t() : created(TIMESTAMP_NOW) {}
-    tspec_app_t(tspec_app_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
+    tspec_app_t(tspec_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
 
 
     void modify(const tspec_data_t &that)
@@ -214,16 +210,18 @@ public:
       data.update(that);
       modified = TIMESTAMP_NOW;
     }
+
+    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(created)(modified));
   };
+
   typedef uint64_t proposal_id_t;
 
   //@abi table proposals i64
   struct proposal_t
   {
-
     enum state_t
     {
-      STATE_TSPEC_APP,
+      STATE_TSPEC_APP = 1,
       STATE_TSPEC_CREATE,
       STATE_TSPEC_WORK,
       STATE_TSPEC_FINISHED
@@ -249,7 +247,7 @@ public:
 
     block_timestamp created;
     block_timestamp modified;
-    state_t state;
+    uint8_t state;
 
     uint64_t primary_key() const { return id; }
 
@@ -257,11 +255,11 @@ public:
       state = new_state;
     }
 
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(created)(modified)(state));
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(created)(modified)(state));
   };
 
   typedef multi_index<N(proposals), proposal_t> proposals_t;
-  proposals_t *_proposals = nullptr;
+  proposals_t _proposals;
 
   //@abi table states i64
   struct state_t
@@ -274,7 +272,7 @@ public:
   };
 
   typedef multi_index<N(states), state_t> states_t;
-  states_t *_states = nullptr;
+  states_t _states;
 
   //@abi table funds i64
   struct fund_t
@@ -286,14 +284,14 @@ public:
   };
 
   typedef multi_index<N(funds), fund_t> funds_t;
-  funds_t *_funds = nullptr;
+  funds_t _funds;
 
   app_domain_t _app = 0;
 
 protected:
   auto get_state()
   {
-    auto itr = _states->find(0);
+    auto itr = get_states().find(0);
     eosio_assert(itr != get_states().end(), "worker's pool has not been created for the speicifed app domain");
     return itr;
   }
@@ -319,24 +317,14 @@ protected:
         .send();
   }
 
-  void init(app_domain_t app)
-  {
-    _app = app;
-    _states = new states_t(_self, app);
-    _proposals = new proposals_t(_self, app);
-    _funds = new funds_t(_self, app);
-  }
-
   states_t &get_states()
   {
-    eosio_assert(_states != nullptr, "contract is not initialized");
-    return *_states;
+    return _states;
   }
 
   proposals_t &get_proposals()
   {
-    eosio_assert(_proposals != nullptr, "contract is not initialized");
-    return *_proposals;
+    return _proposals;
   }
 
   const auto get_proposal(proposal_id_t proposal_id) {
@@ -347,25 +335,17 @@ protected:
 
   funds_t &get_funds()
   {
-    eosio_assert(_funds != nullptr, "contract is not initialized");
-    return *_funds;
+    return _funds;
   }
 
 public:
-  worker(account_name owner, app_domain_t app) : contract(owner)
+  worker(account_name owner, app_domain_t app) :
+    contract(owner),
+    _app(app),
+    _states(_self, app),
+    _proposals(_self, app),
+    _funds(_self, app)
   {
-    init(app);
-  }
-
-  worker(account_name owner) : contract(owner)
-  {
-  }
-
-  ~worker()
-  {
-    delete _proposals;
-    delete _states;
-    delete _funds;
   }
 
   /// @abi action
@@ -392,9 +372,11 @@ public:
       o.author = author;
       o.title = title;
       o.description = description;
-      o.created = block_timestamp(now());
-      o.modified = block_timestamp(0);
+      o.created = TIMESTAMP_NOW;
+      o.modified = TIMESTAMP_UNDEFINED;
+      o.state = (uint8_t) proposal_t::STATE_TSPEC_APP;
     });
+    LOG("added");
   }
 
   // @abi action
@@ -492,14 +474,14 @@ public:
     });
   }
 
-  inline auto gettspec(proposal_t &proposal, tspec_app_id_t tspec_app_id)
+  inline auto gettspec(proposal_t &proposal, tspec_id_t tspec_app_id)
   {
     return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
       return o.id == tspec_app_id;
     });
   }
 
-  inline const auto gettspec(const proposal_t &proposal, tspec_app_id_t tspec_app_id)
+  inline const auto gettspec(const proposal_t &proposal, tspec_id_t tspec_app_id)
   {
     return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
       return o.id == tspec_app_id;
@@ -507,7 +489,7 @@ public:
   }
 
   /// @abi action
-  void addtspec(proposal_id_t proposal_id, tspec_app_id_t tspec_id, account_name author, const tspec_data_t &data)
+  void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, const tspec_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -524,7 +506,7 @@ public:
   }
 
   /// @abi action
-  void edittspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id, account_name author, const tspec_data_t &that)
+  void edittspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, const tspec_data_t &that)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -542,7 +524,7 @@ public:
   }
 
   /// @abi action
-  void deltspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id)
+  void deltspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -557,7 +539,7 @@ public:
   }
 
   /// @abi action
-  void uvotetspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id, account_name author, string comment)
+  void uvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, string comment)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -577,7 +559,7 @@ public:
   }
 
   /// @abi action
-  void dvotetspec(proposal_id_t proposal_id, tspec_app_id_t tspec_app_id, account_name author, string comment)
+  void dvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, string comment)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -635,14 +617,14 @@ public:
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
   /// @abi action
-  void transfer(currency::transfer &t)
+  static void transfer(currency::transfer &t)
   {
-    init(eosio::string_to_name(t.memo.c_str()));
-    LOG("transfer % from \"%\" to \"%\"", t.quantity.amount, name{t.from}.to_string().c_str(), name{t.to}.to_string().c_str());
+    print_f("%: transfer % from \"%\" to \"%\"", __FUNCTION__, t.quantity.amount, name{t.from}.to_string().c_str(), name{t.to}.to_string().c_str());
 
-    if (t.to != _self || t.quantity.symbol == get_state()->token_symbol)
+    worker self(current_receiver(), eosio::string_to_name(t.memo.c_str()));
+    if (t.to != self._self || t.quantity.symbol == self.get_state()->token_symbol)
     {
-      LOG("transfer from a wrong token");
+      print_f("%: transfer from a wrong token", __FUNCTION__);
       return;
     }
 
@@ -651,17 +633,17 @@ public:
 
     const account_name &payer = t.to;
 
-    auto fund = get_funds().find(t.from);
-    if (fund == get_funds().end())
+    auto fund = self.get_funds().find(t.from);
+    if (fund == self.get_funds().end())
     {
-      get_funds().emplace(payer, [&](auto &fund) {
+      self.get_funds().emplace(payer, [&](auto &fund) {
         fund.owner = t.from;
         fund.quantity = t.quantity;
       });
     }
     else
     {
-      get_funds().modify(fund, payer, [&](auto &fund) {
+      self.get_funds().modify(fund, payer, [&](auto &fund) {
         eosio_assert(fund.owner == t.from, "invalid fund owner");
         fund.quantity += t.quantity;
       });

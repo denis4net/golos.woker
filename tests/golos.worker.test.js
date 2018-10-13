@@ -51,7 +51,7 @@ it(
     const contract = await eosTest.deploy(
       "golos.worker",
       "contracts/golos.worker/golos.worker.wasm",
-      "contracts/golos.worker/golos.worker.abi"
+      "contracts/golos.worker/golos.worker.abi.json"
     );
 
     console.log("create");
@@ -153,7 +153,7 @@ it(
           proposal.id,
           comment.id,
           comment.user,
-          comment.text,
+          comment,
           { authorization: comment.user }
         );
       }

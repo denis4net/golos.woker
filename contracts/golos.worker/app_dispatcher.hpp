@@ -64,8 +64,8 @@ bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args..
     BOOST_PP_SEQ_FOR_EACH(APP_ACTION_API_CALL, TYPENAME, MEMBERS)
 
 
-template <typename T, typename Q, typename... Args>
-bool execute_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args...))
+template <typename... Args>
+bool execute_action(uint64_t receiver, uint64_t code, void (*func)(Args...))
 {
     size_t size = action_data_size();
     //using malloc/free here potentially is not exception-safe, although WASM doesn't support exceptions
@@ -84,10 +84,8 @@ bool execute_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args...))
         free(buffer);
     }
 
-    T obj(receiver);
-
     auto f2 = [&](auto... a) {
-        (obj.*func)(a...);
+        (func)(a...);
     };
 
     boost::mp11::tuple_apply(f2, args);
@@ -97,7 +95,7 @@ bool execute_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args...))
 
 #define ACTION_API_CALL(r, TYPENAME, elem)                          \
     case ::eosio::string_to_name(BOOST_PP_STRINGIZE(elem)):         \
-        ::golos::execute_action<TYPENAME>(receiver, code, &TYPENAME::elem);         \
+        ::golos::execute_action(receiver, code, TYPENAME::elem);         \
         break;
 
 #define ACTIONS(TYPENAME, MEMBERS) \

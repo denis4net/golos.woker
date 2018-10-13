@@ -7,6 +7,8 @@ template <typename T>
 class set_t : public std::vector<T>
 {
   public:
+    uint8_t f;
+
     using std::vector<T>::end;
     using std::vector<T>::begin;
     using std::vector<T>::erase;
@@ -32,5 +34,6 @@ class set_t : public std::vector<T>
         }
         return false;
     }
-    // EOSLIB_SERIALIZE_DERIVED(set_t, std::vector, ());
+
+    EOSLIB_SERIALIZE_DERIVED(set_t, std::vector<T>, (f));
 };

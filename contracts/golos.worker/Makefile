@@ -4,7 +4,7 @@ CONTRACT := golos.worker
 SRC := main.cpp
 CXX := eosiocpp
 
-all: $(CONTRACT).wast $(CONTRACT).abi
+all: $(CONTRACT).wast
 
 $(CONTRACT).wast: $(SRC)
 	$(CXX) -o $@ $<

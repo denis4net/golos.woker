@@ -4,7 +4,7 @@
     { "new_type_name": "proposal_id_t", "type": "uint64" },
     { "new_type_name": "comment_id_t", "type": "uint64" },
     { "new_type_name": "tspec_id_t", "type": "uint64" },
-    { "new_type_name": "symbol_name", "type": "uint64" }
+    { "new_type_name": "symbol_name", "type": "symbol_code" }
   ],
   "structs": [
     {
@@ -97,7 +97,22 @@
         { "name": "owner", "type": "name" },
         { "name": "quantity", "type": "asset" }
       ]
-    },{
+    },
+    {
+      "name": "createpool",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "token_symbol",
+          "type": "symbol_code"
+        }
+      ]
+    },
+    {
       "name": "addpropos",
       "base": "",
       "fields": [
