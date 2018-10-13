@@ -358,21 +358,21 @@ protected:
     return fund_ptr;
   }
 
-  inline auto gettspec(proposal_t &proposal, tspec_id_t tspec_app_id)
+  inline auto get_tspec(proposal_t &proposal, tspec_id_t tspec_app_id)
   {
     return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
       return o.id == tspec_app_id;
     });
   }
 
-  inline const auto gettspec(const proposal_t &proposal, tspec_id_t tspec_app_id)
+  inline const auto get_tspec(const proposal_t &proposal, tspec_id_t tspec_app_id)
   {
     return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
       return o.id == tspec_app_id;
     });
   }
 
-  void setpropostspec(proposal_t &proposal, tspec_app_t &tspec_app)
+  void choose_proposal_tspec(proposal_t &proposal, tspec_app_t &tspec_app)
   {
     const asset budget = tspec_app.data.development_cost + tspec_app.data.specification_cost;
     auto fund = get_funds().find(proposal.fund);
@@ -400,6 +400,8 @@ protected:
 
   void refund(proposal_t &proposal)
   {
+    eosio_assert(proposal.budget.amount > 0, "no funds were deposited");
+
     auto fund_ptr = get_fund(proposal.fund);
     get_funds().modify(fund_ptr, _app, [&](auto &fund) {
       fund.quantity += proposal.budget;
@@ -575,7 +577,7 @@ public:
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
 
-    const auto tspec = gettspec(*proposal, tspec_id);
+    const auto tspec = get_tspec(*proposal, tspec_id);
     eosio_assert(tspec == proposal->tspec_apps.end(),
                  "technical specification is already exists with the same id");
 
@@ -593,7 +595,7 @@ public:
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     eosio_assert(proposal->state == proposal_t::STATE_TSPEC_APP, "invalid state");
 
-    const auto tspec = gettspec(*proposal, tspec_app_id);
+    const auto tspec = get_tspec(*proposal, tspec_app_id);
     eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     eosio_assert(that.specification_cost.symbol == get_state()->token_symbol, "invalid token symbol");
     eosio_assert(that.development_cost.symbol == get_state()->token_symbol, "invalid token symbol");
@@ -601,7 +603,7 @@ public:
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      auto tspec = gettspec(o, tspec_app_id);
+      auto tspec = get_tspec(o, tspec_app_id);
       tspec->modify(that);
     });
   }
@@ -611,13 +613,13 @@ public:
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
-    auto tspec = gettspec(*proposal, tspec_app_id);
+    auto tspec = get_tspec(*proposal, tspec_app_id);
     eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
     eosio_assert(tspec->votes.upvotes.empty(), "technical specification bid can't be deleted because it already has been upvoted"); //Technical Specification 1.e
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      o.tspec_apps.erase(gettspec(o, tspec_app_id));
+      o.tspec_apps.erase(get_tspec(o, tspec_app_id));
     });
   }
 
@@ -628,12 +630,12 @@ public:
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     eosio_assert(proposal->state == proposal_t::STATE_TSPEC_APP, "invalid state");
 
-    const auto tspec = gettspec(*proposal, tspec_app_id);
+    const auto tspec = get_tspec(*proposal, tspec_app_id);
     eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      auto tspec = gettspec(o, tspec_app_id);
+      auto tspec = get_tspec(o, tspec_app_id);
       tspec->votes.upvote(author);
 
       if (!comment.text.empty())
@@ -643,7 +645,7 @@ public:
 
       if (tspec->votes.upvotes.size() >= witness_count_51)
       {
-        setpropostspec(o, *tspec);
+        choose_proposal_tspec(o, *tspec);
       }
     });
   }
@@ -655,12 +657,12 @@ public:
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     eosio_assert(proposal->state == proposal_t::STATE_TSPEC_APP, "invalid state");
 
-    const auto tspec = gettspec(*proposal, tspec_app_id);
+    const auto tspec = get_tspec(*proposal, tspec_app_id);
     eosio_assert(tspec != proposal->tspec_apps.end(), "technical specification doesn't exist");
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
-      auto tspec = gettspec(o, tspec_app_id);
+      auto tspec = get_tspec(o, tspec_app_id);
       tspec->votes.downvote(author);
       if (!comment.text.empty())
       {
@@ -709,13 +711,6 @@ public:
   }
 
   /// @abi action
-  void cancel(proposal_id_t proposal_id, account_name delegate)
-  {
-    auto proposal_ptr = get_proposal(proposal_id);
-    eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
-  }
-
-  /// @abi action
   void acceptwork(proposal_id_t proposal_id, account_name tspec_author)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -733,12 +728,14 @@ public:
     auto proposal_ptr = get_proposal(proposal_id);
     require_app_delegate(reviewer);
 
-    eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state");
-
     get_proposals().modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
       switch (status)
       {
       case proposal_t::STATUS_REJECT:
+        eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
+                     proposal.state == proposal_t::STATE_WORK ||
+                     proposal.state == proposal_t::STATE_WORK_REVIEW, "invalid state");
+
         proposal.review_votes.downvote(reviewer);
         if (proposal.review_votes.downvotes.size() >= witness_count_51)
         {
@@ -748,6 +745,8 @@ public:
         break;
 
       case proposal_t::STATUS_ACCEPT:
+        eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state");
+
         proposal.review_votes.downvote(reviewer);
         if (proposal.review_votes.upvotes.size() >= witness_count_51)
         {
