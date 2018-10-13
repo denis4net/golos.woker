@@ -195,7 +195,7 @@
       ]
     },
     {
-      "name": "upvote",
+      "name": "votepropos",
       "base": "",
       "fields": [
         {
@@ -209,6 +209,10 @@
         {
           "name": "author",
           "type": "name"
+        },
+        {
+          "name": "vote",
+          "type": "uint8"
         }
       ]
     },
