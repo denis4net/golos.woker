@@ -61,6 +61,8 @@ public:
   {
     vector<comment_t> comments;
 
+    EOSLIB_SERIALIZE(comments_module_t, (comments));
+
     void add(comment_id_t id, account_name author, const comment_data_t &data)
     {
       eosio_assert(std::find_if(comments.begin(), comments.end(), [&](const comment_t &comment) {
@@ -115,6 +117,8 @@ public:
     block_timestamp development_eta;
     uint8_t payments_count;
 
+    EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
+
     void update(const tspec_data_t &that)
     {
       if (!that.text.empty())
@@ -146,8 +150,6 @@ public:
         payments_count = that.payments_count;
       }
     }
-
-    EOSLIB_SERIALIZE(tspec_data_t, (text)(specification_cost)(specification_eta)(development_cost)(development_eta)(payments_count));
   };
 
   struct voting_module_t
@@ -201,17 +203,16 @@ public:
     block_timestamp created;
     block_timestamp modified;
 
+    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(comments)(created)(modified));
+
     tspec_app_t() : created(TIMESTAMP_NOW) {}
     tspec_app_t(tspec_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
-
 
     void modify(const tspec_data_t &that)
     {
       data.update(that);
       modified = TIMESTAMP_NOW;
     }
-
-    EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(created)(modified));
   };
 
   typedef uint64_t proposal_id_t;
@@ -231,31 +232,28 @@ public:
     account_name author;
     string title;
     string description;
-
     voting_module_t votes;
     comments_module_t comments;
-
     // technical specification applications
     vector<tspec_app_t> tspec_apps;
-
     ///< technical specification author
     account_name tspec_author;
     ///< technical specification data
     tspec_data_t tspec;
     ///< perpetrator account name
     account_name worker;
-
     block_timestamp created;
     block_timestamp modified;
     uint8_t state;
 
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(created)(modified)(state));
+
     uint64_t primary_key() const { return id; }
 
-    void set_state(state_t new_state) {
+    void set_state(state_t new_state)
+    {
       state = new_state;
     }
-
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(title)(description)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(created)(modified)(state));
   };
 
   typedef multi_index<N(proposals), proposal_t> proposals_t;
@@ -266,9 +264,9 @@ public:
   {
     symbol_name token_symbol;
 
-    uint64_t primary_key() const { return 0; }
-
     EOSLIB_SERIALIZE(state_t, (token_symbol));
+
+    uint64_t primary_key() const { return 0; }
   };
 
   typedef multi_index<N(states), state_t> states_t;
@@ -279,8 +277,10 @@ public:
   {
     account_name owner;
     asset quantity;
-    uint64_t primary_key() const { return owner; }
+
     EOSLIB_SERIALIZE(fund_t, (owner)(quantity));
+
+    uint64_t primary_key() const { return owner; }
   };
 
   typedef multi_index<N(funds), fund_t> funds_t;
@@ -327,7 +327,8 @@ protected:
     return _proposals;
   }
 
-  const auto get_proposal(proposal_id_t proposal_id) {
+  const auto get_proposal(proposal_id_t proposal_id)
+  {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
     return proposal;
@@ -339,12 +340,11 @@ protected:
   }
 
 public:
-  worker(account_name owner, app_domain_t app) :
-    contract(owner),
-    _app(app),
-    _states(_self, app),
-    _proposals(_self, app),
-    _funds(_self, app)
+  worker(account_name owner, app_domain_t app) : contract(owner),
+                                                 _app(app),
+                                                 _states(_self, app),
+                                                 _proposals(_self, app),
+                                                 _funds(_self, app)
   {
   }
 
@@ -374,7 +374,7 @@ public:
       o.description = description;
       o.created = TIMESTAMP_NOW;
       o.modified = TIMESTAMP_UNDEFINED;
-      o.state = (uint8_t) proposal_t::STATE_TSPEC_APP;
+      o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
     });
     LOG("added");
   }
@@ -552,8 +552,8 @@ public:
       auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.upvote(author);
 
-      if (tspec->votes.upvotes.size() >= witness_count_51) {
-
+      if (tspec->votes.upvotes.size() >= witness_count_51)
+      {
       }
     });
   }
@@ -574,7 +574,8 @@ public:
   }
 
   /// @abi action
-  void settspec(proposal_id_t proposal_id, const tspec_data_t &data) {
+  void settspec(proposal_id_t proposal_id, const tspec_data_t &data)
+  {
     auto proposalIt = get_proposal(proposal_id);
     eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
 
@@ -584,7 +585,8 @@ public:
     });
   }
 
-  void setworker(proposal_id_t proposal_id, account_name worker) {
+  void setworker(proposal_id_t proposal_id, account_name worker)
+  {
     auto proposalIt = get_proposal(proposal_id);
     eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
 
@@ -595,24 +597,24 @@ public:
   }
 
   /// @abi action
-  void cancel(proposal_id_t proposal_id, account_name delegate) {
+  void cancel(proposal_id_t proposal_id, account_name delegate)
+  {
     auto proposalIt = get_proposal(proposal_id);
     eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_WORK, "invalid proposal state");
-
   }
 
   /// @abi action
-  void acceptwork(proposal_id_t proposal_id, account_name tspec_author) {
+  void acceptwork(proposal_id_t proposal_id, account_name tspec_author)
+  {
     auto proposalIt = get_proposal(proposal_id);
     eosio_assert(proposalIt->state == proposal_t::STATE_TSPEC_WORK, "invalid proposal state");
-
   }
 
   /// @abi action
-  void approvework(proposal_id_t proposal_id, account_name delegate) {
+  void approvework(proposal_id_t proposal_id, account_name delegate)
+  {
     require_app_delegate(delegate);
     auto proposalIt = get_proposal(proposal_id);
-
   }
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb

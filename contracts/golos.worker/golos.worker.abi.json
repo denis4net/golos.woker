@@ -4,7 +4,8 @@
     { "new_type_name": "proposal_id_t", "type": "uint64" },
     { "new_type_name": "comment_id_t", "type": "uint64" },
     { "new_type_name": "tspec_id_t", "type": "uint64" },
-    { "new_type_name": "symbol_name", "type": "symbol_code" }
+    { "new_type_name": "symbol_name", "type": "symbol_code" },
+    { "new_type_name": "block_timestamp", "type": "uint32" }
   ],
   "structs": [
     {
@@ -19,11 +20,6 @@
       "name": "comment_data_t",
       "base": "",
       "fields": [{ "name": "text", "type": "string" }]
-    },
-    {
-      "name": "block_timestamp",
-      "base": "",
-      "fields": [{ "name": "slot", "type": "uint32" }]
     },
     {
       "name": "comment_t",
@@ -231,8 +227,8 @@
           "type": "name"
         },
         {
-          "name": "text",
-          "type": "string"
+          "name": "data",
+          "type": "comment_data_t"
         }
       ]
     },
