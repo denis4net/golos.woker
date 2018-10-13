@@ -224,6 +224,7 @@ public:
     {
       STATE_TSPEC_APP = 1,
       STATE_TSPEC_CREATE,
+      STATE_TSPEC_SPECIFICATION,
       STATE_TSPEC_WORK,
       STATE_TSPEC_FINISHED
     };
@@ -343,6 +344,40 @@ protected:
     return _funds;
   }
 
+  inline auto gettspec(proposal_t &proposal, tspec_id_t tspec_app_id)
+  {
+    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
+      return o.id == tspec_app_id;
+    });
+  }
+
+  inline const auto gettspec(const proposal_t &proposal, tspec_id_t tspec_app_id)
+  {
+    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
+      return o.id == tspec_app_id;
+    });
+  }
+
+  void setpropostspec(proposal_t &proposal, tspec_app_t &tspec_app)
+  {
+    const asset budget = tspec_app.data.development_cost + tspec_app.data.specification_cost;
+    auto fund = get_funds().find(proposal.fund);
+    eosio_assert(fund != get_funds().end(), "fund doens't exist");
+    eosio_assert(budget <= fund->quantity, "insufficient funds");
+
+    proposal.tspec_author = tspec_app.author;
+    proposal.tspec = tspec_app.data;
+    proposal.set_state(proposal_t::STATE_TSPEC_SPECIFICATION);
+
+    if (proposal.budget == ZERO_ASSET)
+    {
+      proposal.budget = budget;
+      get_funds().modify(fund, proposal.fund, [&](auto &fund) {
+        fund.quantity -= budget;
+      });
+    }
+  }
+
 public:
   worker(account_name owner, app_domain_t app) : contract(owner),
                                                  _app(app),
@@ -379,6 +414,7 @@ public:
       o.created = TIMESTAMP_NOW;
       o.modified = TIMESTAMP_UNDEFINED;
       o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
+      o.fund = _app;
     });
     LOG("added");
   }
@@ -498,20 +534,6 @@ public:
     });
   }
 
-  inline auto gettspec(proposal_t &proposal, tspec_id_t tspec_app_id)
-  {
-    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
-      return o.id == tspec_app_id;
-    });
-  }
-
-  inline const auto gettspec(const proposal_t &proposal, tspec_id_t tspec_app_id)
-  {
-    return std::find_if(proposal.tspec_apps.begin(), proposal.tspec_apps.end(), [&](const auto &o) {
-      return o.id == tspec_app_id;
-    });
-  }
-
   /// @abi action
   void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, const tspec_data_t &data)
   {
@@ -563,7 +585,7 @@ public:
   }
 
   /// @abi action
-  void uvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, string comment)
+  void uvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, comment_id_t comment_id, const comment_data_t &comment)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -576,14 +598,20 @@ public:
       auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.upvote(author);
 
+      if (!comment.text.empty())
+      {
+        tspec->comments.add(comment_id, author, comment);
+      }
+
       if (tspec->votes.upvotes.size() >= witness_count_51)
       {
+        setpropostspec(o, *tspec);
       }
     });
   }
 
   /// @abi action
-  void dvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, string comment)
+  void dvotetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, comment_id_t comment_id, const comment_data_t &comment)
   {
     auto proposal = get_proposals().find(proposal_id);
     eosio_assert(proposal != get_proposals().end(), "proposal has not been found");
@@ -594,6 +622,15 @@ public:
     get_proposals().modify(proposal, tspec->author, [&](auto &o) {
       auto tspec = gettspec(o, tspec_app_id);
       tspec->votes.downvote(author);
+      if (!comment.text.empty())
+      {
+        tspec->comments.add(comment_id, author, comment);
+      }
+
+      if (tspec->votes.downvotes.size() >= witness_count_51)
+      {
+        //TODO: cancel
+      }
     });
   }
 
