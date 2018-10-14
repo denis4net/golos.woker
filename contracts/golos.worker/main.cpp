@@ -558,7 +558,7 @@ public:
     auto proposal_ptr = get_proposals().find(proposal_id);
     eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
     eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() <= now(), "voting time is over");
-    require_app_delegate(author);
+    require_app_member(author);
 
     get_proposals().modify(proposal_ptr, author, [&](auto &o) {
       o.votes.vote(author, static_cast<voting_module_t::vote_value_t>(vote));
