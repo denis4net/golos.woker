@@ -68,16 +68,21 @@
       "fields": [
         { "name": "id", "type": "proposal_id_t" },
         { "name": "author", "type": "name" },
-        { "name": "fund", "type": "name" },
-        { "name": "budget", "type": "asset" },
+        { "name": "type", "tpye": "uint8" },
         { "name": "title", "type": "string" },
         { "name": "description", "type": "string" },
+        { "name": "fund_name", "type": "name" },
+        { "name": "deposit", "type": "asset" },
         { "name": "votes", "type": "voting_module_t" },
         { "name": "comments", "type": "comments_module_t" },
         { "name": "tspec_apps", "type": "tspec_app_t[]" },
         { "name": "tspec_author", "type": "name" },
         { "name": "tspec", "type": "tspec_data_t" },
         { "name": "worker", "type": "name" },
+        { "name": "work_begining_time", "type": "block_timestamp"},
+        { "name": "work_status", "type": "comments_module_t"},
+        { "name": "worker_payments_count", "type": "uint8" },
+        { "name": "review_votes", "type": "voting_module_t" },
         { "name": "created", "type": "block_timestamp" },
         { "name": "modified", "type": "block_timestamp" },
         { "name": "state", "type": "uint8" }
@@ -133,6 +138,40 @@
         {
           "name": "description",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "addpropos2",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "author",
+          "type": "name"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "specification",
+          "type": "tspec_data_t"
+        },
+        {
+          "name": "worker",
+          "type": "name"
         }
       ]
     },
@@ -217,24 +256,6 @@
       ]
     },
     {
-      "name": "downvote",
-      "base": "",
-      "fields": [
-        {
-          "name": "app_domain",
-          "type": "name"
-        },
-        {
-          "name": "proposal_id",
-          "type": "proposal_id_t"
-        },
-        {
-          "name": "author",
-          "type": "name"
-        }
-      ]
-    },
-    {
       "name": "addcomment",
       "base": "",
       "fields": [
@@ -277,8 +298,8 @@
           "type": "comment_id_t"
         },
         {
-          "name": "text",
-          "type": "string"
+          "name": "comment",
+          "type": "comment_data_t"
         }
       ]
     },
@@ -367,7 +388,7 @@
       ]
     },
     {
-      "name": "uvotetspec",
+      "name": "votetspec",
       "base": "",
       "fields": [
         {
@@ -400,7 +421,6 @@
         }
       ]
     },
-
     {
       "name": "transfer",
       "base": "",
