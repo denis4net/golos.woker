@@ -207,7 +207,7 @@ public:
     EOSLIB_SERIALIZE(voting_module_t, (upvotes)(downvotes));
   };
 
-  struct  tspec_app_t
+  struct tspec_app_t
   {
     tspec_id_t id;
     account_name author;
@@ -251,9 +251,10 @@ public:
       STATUS_ACCEPT = 1
     };
 
-    enum type_t {
-        TYPE_1,
-        TYPE_2
+    enum type_t
+    {
+      TYPE_1,
+      TYPE_2
     };
 
     proposal_id_t id;
@@ -283,12 +284,7 @@ public:
     block_timestamp modified;
     uint8_t state;
 
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)\
-                     (fund_name)(deposit)\
-                     (votes)(comments)(tspec_apps)(tspec_author)(tspec)\
-                     (worker)(work_begining_time)(work_status)(worker_payments_count)\
-                     (review_votes)\
-                     (created)(modified)(state));
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)(fund_name)(deposit)(votes)(comments)(tspec_apps)(tspec_author)(tspec)(worker)(work_begining_time)(work_status)(worker_payments_count)(review_votes)(created)(modified)(state));
 
     uint64_t primary_key() const { return id; }
     void set_state(state_t new_state) { state = new_state; }
@@ -343,7 +339,6 @@ protected:
     //TODO: eosio_assert(golos.ctrl::is_witness(account, _app), "app domain delegate authority is required to do this action");
   }
 
-
   proposals_t &get_proposals()
   {
     return _proposals;
@@ -392,11 +387,14 @@ protected:
     proposal.tspec_author = tspec_app.author;
     proposal.tspec = tspec_app.data;
 
-    if (proposal.type == proposal_t::TYPE_1) {
-        proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
-    } else {
-        proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
-        proposal.worker = proposal.tspec_author;
+    if (proposal.type == proposal_t::TYPE_1)
+    {
+      proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
+    }
+    else
+    {
+      proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
+      proposal.worker = proposal.tspec_author;
     }
 
     if (proposal.deposit == ZERO_ASSET)
@@ -411,19 +409,19 @@ protected:
   void pay_tspec_author(proposal_t &proposal)
   {
 
-      proposal.deposit -= proposal.tspec.specification_cost;
+    proposal.deposit -= proposal.tspec.specification_cost;
 
-      action(permission_level{_self, N(active)},
-             TOKEN_ACCOUNT, N(transfer),
-             std::make_tuple(_self, proposal.tspec_author,
-                             proposal.tspec.specification_cost,
-                             std::string("technical specification reward"))
-             ).send();
+    action(permission_level{_self, N(active)},
+           TOKEN_ACCOUNT, N(transfer),
+           std::make_tuple(_self, proposal.tspec_author,
+                           proposal.tspec.specification_cost,
+                           std::string("technical specification reward")))
+        .send();
   }
 
-  void enable_worker_reward(proposal_t &proposal) {
-      proposal.set_state(proposal_t::STATE_PAYMENT);
-
+  void enable_worker_reward(proposal_t &proposal)
+  {
+    proposal.set_state(proposal_t::STATE_PAYMENT);
   }
 
   void refund(proposal_t &proposal)
@@ -438,7 +436,8 @@ protected:
     proposal.deposit = ZERO_ASSET;
   }
 
-  void close(proposal_t &proposal) {
+  void close(proposal_t &proposal)
+  {
     proposal.set_state(proposal_t::STATE_CLOSED);
   }
 
@@ -462,7 +461,7 @@ public:
     eosio_assert(!_state.exists(), "workers pool is already initialized for the specified app domain");
     require_auth(_app);
 
-    _state.set(state_t{.token_symbol=token_symbol}, _app);
+    _state.set(state_t{.token_symbol = token_symbol}, _app);
   }
 
   /// @abi action
@@ -504,34 +503,32 @@ public:
    * @param worker the party that did work
    */
   void addpropos2(proposal_id_t proposal_id, account_name author,
-                  const string& title, const string& description,
+                  const string &title, const string &description,
                   const tspec_data_t &specification, account_name worker)
   {
-      require_app_member(author);
+    require_app_member(author);
 
-      LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), name{author}.to_string().c_str());
+    LOG("adding propos % \"%\" by %", proposal_id, title.c_str(), name{author}.to_string().c_str());
 
-      get_proposals().emplace(author, [&](proposal_t &o) {
-        o.id = proposal_id;
-        o.type = proposal_t::TYPE_2;
-        o.author = author;
-        o.title = title;
-        o.description = description;
-        o.created = TIMESTAMP_NOW;
-        o.modified = TIMESTAMP_UNDEFINED;
-        o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
-        o.tspec = specification;
-        o.fund_name = _app;
+    get_proposals().emplace(author, [&](proposal_t &o) {
+      o.id = proposal_id;
+      o.type = proposal_t::TYPE_2;
+      o.author = author;
+      o.title = title;
+      o.description = description;
+      o.created = TIMESTAMP_NOW;
+      o.modified = TIMESTAMP_UNDEFINED;
+      o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
+      o.tspec = specification;
+      o.fund_name = _app;
 
-        o.tspec_apps.push_back(tspec_app_t{
-                                   .id = 0,
-                                   .author = author,
-                                   .data = specification,
-                                   .created = TIMESTAMP_NOW,
-                                   .modified = TIMESTAMP_UNDEFINED
-                               });
-
-      });
+      o.tspec_apps.push_back(tspec_app_t{
+          .id = 0,
+          .author = author,
+          .data = specification,
+          .created = TIMESTAMP_NOW,
+          .modified = TIMESTAMP_UNDEFINED});
+    });
   }
 
   // @abi action
@@ -611,7 +608,6 @@ public:
     require_app_member(proposal_ptr->author);
     get_proposals().erase(proposal_ptr);
   }
-
 
   /**
    * @brief votepropos places a vote for the proposal
@@ -704,12 +700,11 @@ public:
 
     get_proposals().modify(proposal_ptr, author, [&](auto &o) {
       tspec_app_t spec = {
-                          .id=tspec_id,
-                          .author=author,
-                          .created=TIMESTAMP_NOW,
-                          .modified=TIMESTAMP_UNDEFINED,
-                          .data = tspec
-                         };
+          .id = tspec_id,
+          .author = author,
+          .created = TIMESTAMP_NOW,
+          .modified = TIMESTAMP_UNDEFINED,
+          .data = tspec};
       o.tspec_apps.push_back(spec);
     });
   }
@@ -729,16 +724,16 @@ public:
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
-    const auto tspec = get_tspec(*proposal_ptr, tspec_app_id);
-    eosio_assert(tspec != proposal_ptr->tspec_apps.end(), "technical specification doesn't exist");
+    const auto tspec_ptr = get_tspec(*proposal_ptr, tspec_app_id);
+    eosio_assert(tspec_ptr != proposal_ptr->tspec_apps.end(), "technical specification doesn't exist");
     eosio_assert(tspec.specification_cost.symbol == get_state().token_symbol, "invalid token symbol");
     eosio_assert(tspec.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
 
-    require_app_member(tspec->author);
+    require_app_member(tspec_ptr->author);
 
-    get_proposals().modify(proposal_ptr, tspec->author, [&](auto &o) {
-      auto tspec = get_tspec(o, tspec_app_id);
-      tspec->modify(tspec);
+    get_proposals().modify(proposal_ptr, tspec_ptr->author, [&](auto &o) {
+      auto mtspec_ptr = get_tspec(o, tspec_app_id);
+      mtspec_ptr->modify(tspec);
     });
   }
 
@@ -803,7 +798,7 @@ public:
         }
         break;
       case voting_module_t::VOTE_DOWN:
-          break;
+        break;
       }
     });
   }
@@ -850,20 +845,24 @@ public:
    * @param proposal_id propsal ID
    * @param initiator a cancel initiator's account name
    */
-  void cancelwork(proposal_id_t proposal_id, account_name initiator) {
-      auto proposal_ptr = get_proposal(proposal_id);
-      eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
-      eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+  void cancelwork(proposal_id_t proposal_id, account_name initiator)
+  {
+    auto proposal_ptr = get_proposal(proposal_id);
+    eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
+    eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
-      if (initiator == proposal_ptr->worker) {
-        require_auth(proposal_ptr->worker);
-      } else {
-          require_auth(proposal_ptr->tspec_author);
-      }
+    if (initiator == proposal_ptr->worker)
+    {
+      require_auth(proposal_ptr->worker);
+    }
+    else
+    {
+      require_auth(proposal_ptr->tspec_author);
+    }
 
-      get_proposals().modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
-          refund(proposal);
-      });
+    get_proposals().modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
+      refund(proposal);
+    });
   }
 
   /// @abi action
@@ -882,11 +881,12 @@ public:
     require_auth(proposal_ptr->worker);
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
-        proposal.work_status.add(comment_id, proposal.worker, comment);
+      proposal.work_status.add(comment_id, proposal.worker, comment);
 
-        if (finished) {
-            proposal.set_state(proposal_t::STATE_TSPEC_AUTHOR_REVIEW);
-        }
+      if (finished)
+      {
+        proposal.set_state(proposal_t::STATE_TSPEC_AUTHOR_REVIEW);
+      }
     });
   }
 
@@ -921,42 +921,42 @@ public:
    */
   void reviewwork(proposal_id_t proposal_id, account_name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment)
   {
-      require_app_delegate(reviewer);
-      auto proposal_ptr = get_proposal(proposal_id);
-      require_app_delegate(reviewer);
-      get_proposals().modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
-          switch (status)
-          {
-          case proposal_t::STATUS_REJECT:
-              eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
-                           proposal.state == proposal_t::STATE_WORK ||
-                           proposal.state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW,
-                           "invalid state");
+    require_app_delegate(reviewer);
+    auto proposal_ptr = get_proposal(proposal_id);
+    require_app_delegate(reviewer);
+    get_proposals().modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
+      switch (status)
+      {
+      case proposal_t::STATUS_REJECT:
+        eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
+                         proposal.state == proposal_t::STATE_WORK ||
+                         proposal.state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW,
+                     "invalid state");
 
-              proposal.review_votes.downvote(reviewer);
+        proposal.review_votes.downvote(reviewer);
 
-              if (proposal.review_votes.downvotes.size() + 1 >= wintess_count_75)
-              {
-                  refund(proposal);
-                  close(proposal);
-              }
-              break;
+        if (proposal.review_votes.downvotes.size() + 1 >= wintess_count_75)
+        {
+          refund(proposal);
+          close(proposal);
+        }
+        break;
 
-          case proposal_t::STATUS_ACCEPT:
-              eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state");
-              proposal.review_votes.downvote(reviewer);
-              if (proposal.review_votes.upvotes.size() >= witness_count_51)
-              {
-                  pay_tspec_author(proposal);
-                  enable_worker_reward(proposal);
-              }
+      case proposal_t::STATUS_ACCEPT:
+        eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state");
+        proposal.review_votes.downvote(reviewer);
+        if (proposal.review_votes.upvotes.size() >= witness_count_51)
+        {
+          pay_tspec_author(proposal);
+          enable_worker_reward(proposal);
+        }
 
-              break;
+        break;
 
-          default:
-              eosio_assert(false, "invalid review status");
-          }
-      });
+      default:
+        eosio_assert(false, "invalid review status");
+      }
+    });
   }
 
   /**
@@ -969,27 +969,34 @@ public:
     eosio_assert(proposal_ptr->state == proposal_t::STATE_PAYMENT, "invalid state");
     require_auth(proposal_ptr->worker);
 
+    const uint32_t payment_interval = proposal_ptr->tspec.development_eta.to_time_point().sec_since_epoch() / proposal_ptr->tspec.payments_count;
+    const uint32_t payment_epoch = (now() - proposal_ptr->work_begining_time.to_time_point().sec_since_epoch()) / payment_interval;
+    LOG("payment epoch: %, interval: %s, worker payments: %", payment_epoch, payment_interval, int(proposal_ptr->worker_payments_count));
+    eosio_assert(payment_epoch < proposal_ptr->worker_payments_count, "can't withdraw right now");
+
     asset quantity = proposal_ptr->tspec.development_cost / proposal_ptr->tspec.payments_count;
 
-    if (proposal_ptr->worker_payments_count + 1 == proposal_ptr->tspec.payments_count) {
-        quantity += asset(proposal_ptr->tspec.development_cost.amount % proposal_ptr->tspec.payments_count, quantity.symbol);
+    if (proposal_ptr->worker_payments_count + 1 == proposal_ptr->tspec.payments_count)
+    {
+      quantity += asset(proposal_ptr->tspec.development_cost.amount % proposal_ptr->tspec.payments_count, quantity.symbol);
     }
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](proposal_t &proposal) {
-        proposal.deposit -= quantity;
-        proposal.worker_payments_count += 1;
+      proposal.deposit -= quantity;
+      proposal.worker_payments_count += 1;
 
-        if (proposal.worker_payments_count == proposal.tspec.payments_count) {
-            close(proposal);
-        }
+      if (proposal.worker_payments_count == proposal.tspec.payments_count)
+      {
+        close(proposal);
+      }
     });
 
     action(
-                permission_level{_self, N(active)},
-                TOKEN_ACCOUNT, N(transfer),
-                std::make_tuple(_self, proposal_ptr->worker,
-                                quantity, std::string("worker reward"))
-                ).send();
+        permission_level{_self, N(active)},
+        TOKEN_ACCOUNT, N(transfer),
+        std::make_tuple(_self, proposal_ptr->worker,
+                        quantity, std::string("worker reward")))
+        .send();
   }
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
@@ -1029,10 +1036,5 @@ public:
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::worker, (createpool)\
-               (addpropos2)\
-               (addpropos)(editpropos)(delpropos)(votepropos)\
-               (addcomment)(editcomment)(delcomment)\
-               (addtspec)(edittspec)(deltspec)(votetspec)(publishtspec)\
-               (startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork),\
+APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(votetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork),
                (transfer))
