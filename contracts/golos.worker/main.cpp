@@ -207,7 +207,7 @@ public:
     EOSLIB_SERIALIZE(voting_module_t, (upvotes)(downvotes));
   };
 
-  struct tspec_app_t
+  struct  tspec_app_t
   {
     tspec_id_t id;
     account_name author;
@@ -221,9 +221,6 @@ public:
     block_timestamp modified;
 
     EOSLIB_SERIALIZE(tspec_app_t, (id)(author)(data)(votes)(comments)(created)(modified));
-
-    tspec_app_t() : created(TIMESTAMP_NOW) {}
-    tspec_app_t(tspec_id_t id, account_name author) : created(TIMESTAMP_NOW), id(id), author(author) {}
 
     void modify(const tspec_data_t &that)
     {
@@ -395,7 +392,13 @@ protected:
 
     proposal.tspec_author = tspec_app.author;
     proposal.tspec = tspec_app.data;
-    proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
+
+    if (proposal.type == proposal_t::TYPE_1) {
+        proposal.set_state(proposal_t::STATE_TSPEC_CREATE);
+    } else {
+        proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
+        proposal.worker = proposal.tspec_author;
+    }
 
     if (proposal.deposit == ZERO_ASSET)
     {
@@ -485,10 +488,18 @@ public:
         o.description = description;
         o.created = TIMESTAMP_NOW;
         o.modified = TIMESTAMP_UNDEFINED;
-        o.state = (uint8_t)proposal_t::STATE_DELEGATES_REVIEW;
+        o.state = (uint8_t)proposal_t::STATE_TSPEC_APP;
         o.tspec = specification;
-        o.worker = worker;
         o.fund_name = _app;
+
+        o.tspec_apps.push_back(tspec_app_t{
+                                   .id = 0,
+                                   .author = author,
+                                   .data = specification,
+                                   .created = TIMESTAMP_NOW,
+                                   .modified = TIMESTAMP_UNDEFINED
+                               });
+
       });
   }
 
@@ -498,9 +509,8 @@ public:
     eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
     require_app_member(fund_name);
 
-    eosio_assert(proposal_ptr->deposit == ZERO_ASSET, "invalid state");
-    eosio_assert((proposal_ptr->state == proposal_t::STATE_TSPEC_APP && proposal_ptr->type == proposal_t::TYPE_1) ||
-                 (proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW && proposal_ptr->type == proposal_t::TYPE_2), "invalid state");
+    eosio_assert(proposal_ptr->deposit == ZERO_ASSET, "fund is already deposited");
+    eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state");
 
     auto fund_ptr = get_fund(fund_name);
     eosio_assert(fund_ptr->quantity >= quantity, "insufficient funds");
@@ -548,6 +558,8 @@ public:
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state");
     eosio_assert(proposal_ptr->votes.upvotes.size() == 0, "proposal has been approved by one member");
+    eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+
     require_app_member(proposal_ptr->author);
     get_proposals().erase(proposal_ptr);
   }
@@ -600,19 +612,24 @@ public:
   }
 
   /// @abi action
-  void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, const tspec_data_t &data)
+  void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, const tspec_data_t &tspec)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
     eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
-    const auto tspec = get_tspec(*proposal_ptr, tspec_id);
-    eosio_assert(tspec == proposal_ptr->tspec_apps.end(),
+    const auto tspec_ptr = get_tspec(*proposal_ptr, tspec_id);
+    eosio_assert(tspec_ptr == proposal_ptr->tspec_apps.end(),
                  "technical specification is already exists with the same id");
 
     get_proposals().modify(proposal_ptr, author, [&](auto &o) {
-      tspec_app_t spec(tspec_id, author);
-      spec.data.update(data);
+      tspec_app_t spec = {
+                          .id=tspec_id,
+                          .author=author,
+                          .created=TIMESTAMP_NOW,
+                          .modified=TIMESTAMP_UNDEFINED,
+                          .data = tspec
+                         };
       o.tspec_apps.push_back(spec);
     });
   }
