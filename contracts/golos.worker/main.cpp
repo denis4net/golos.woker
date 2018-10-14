@@ -239,8 +239,9 @@ public:
       STATE_TSPEC_APP = 1,
       STATE_TSPEC_CREATE,
       STATE_WORK,
-      STATE_WORK_REVIEW,
+      STATE_TSPEC_AUTHOR_REVIEW,
       STATE_DELEGATES_REVIEW,
+      STATE_PAYMENT,
       STATE_CLOSED
     };
 
@@ -258,10 +259,10 @@ public:
     proposal_id_t id;
     account_name author;
     type_t type;
-    account_name fund_name;
-    asset deposit;
     string title;
     string description;
+    account_name fund_name;
+    asset deposit;
     voting_module_t votes;
     comments_module_t comments;
     // technical specification applications
@@ -271,17 +272,23 @@ public:
     ///< technical specification data
     tspec_data_t tspec;
     ///< perpetrator account name
-    block_timestamp work_begining_time;
     account_name worker;
+    block_timestamp work_begining_time;
+    comments_module_t work_status;
+    uint8_t worker_payments_count;
+
     voting_module_t review_votes;
 
     block_timestamp created;
     block_timestamp modified;
     uint8_t state;
 
-    EOSLIB_SERIALIZE(proposal_t, (id)(author)(fund_name)(deposit)(title)(description)\
+    EOSLIB_SERIALIZE(proposal_t, (id)(author)(type)(title)(description)\
+                     (fund_name)(deposit)\
                      (votes)(comments)(tspec_apps)(tspec_author)(tspec)\
-                     (work_begining_time)(worker)(created)(modified)(state));
+                     (worker)(work_begining_time)(work_status)(worker_payments_count)\
+                     (review_votes)\
+                     (created)(modified)(state));
 
     uint64_t primary_key() const { return id; }
     void set_state(state_t new_state) { state = new_state; }
@@ -336,14 +343,6 @@ protected:
     //TODO: eosio_assert(golos.ctrl::is_witness(account, _app), "app domain delegate authority is required to do this action");
   }
 
-  void withdraw(asset quantity, string memo = "")
-  {
-    action(
-        permission_level{_self, N(active)},
-        TOKEN_ACCOUNT, N(transfer),
-        std::make_tuple(_self, _self, quantity, std::string("")))
-        .send();
-  }
 
   proposals_t &get_proposals()
   {
@@ -409,10 +408,22 @@ protected:
     }
   }
 
-  void pay(proposal_t &proposal, const string &memo)
+  void pay_tspec_author(proposal_t &proposal)
   {
-    withdraw(proposal.deposit, memo);
-    proposal.deposit = ZERO_ASSET;
+
+      proposal.deposit -= proposal.tspec.specification_cost;
+
+      action(permission_level{_self, N(active)},
+             TOKEN_ACCOUNT, N(transfer),
+             std::make_tuple(_self, proposal.tspec_author,
+                             proposal.tspec.specification_cost,
+                             std::string("technical specification reward"))
+             ).send();
+  }
+
+  void enable_worker_reward(proposal_t &proposal) {
+      proposal.set_state(proposal_t::STATE_PAYMENT);
+
   }
 
   void refund(proposal_t &proposal)
@@ -427,8 +438,7 @@ protected:
     proposal.deposit = ZERO_ASSET;
   }
 
-  void close(proposal_t &proposal)
-  {
+  void close(proposal_t &proposal) {
     proposal.set_state(proposal_t::STATE_CLOSED);
   }
 
@@ -745,14 +755,12 @@ public:
           require_auth(proposal_ptr->tspec_author);
       }
 
-      get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
+      get_proposals().modify(proposal_ptr, initiator, [&](proposal_t &proposal) {
           refund(proposal);
-          close(proposal);
-          proposal.set_state(proposal_t::STATE_CLOSED);
       });
   }
 
-  void finishwork(proposal_id_t proposal_id)
+  void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t comment, bool finished)
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
@@ -760,7 +768,10 @@ public:
     require_auth(proposal_ptr->worker);
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
-      proposal.set_state(proposal_t::STATE_WORK_REVIEW);
+
+        if (finished) {
+            proposal.set_state(proposal_t::STATE_TSPEC_AUTHOR_REVIEW);
+        }
     });
   }
 
@@ -768,7 +779,7 @@ public:
   void acceptwork(proposal_id_t proposal_id, account_name tspec_author)
   {
     auto proposal_ptr = get_proposal(proposal_id);
-    eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK_REVIEW, "invalid proposal state");
+    eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW, "invalid proposal state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
@@ -779,47 +790,71 @@ public:
   /// @abi action
   void reviewwork(proposal_id_t proposal_id, account_name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment)
   {
-    require_app_delegate(reviewer);
+      require_app_delegate(reviewer);
+      auto proposal_ptr = get_proposal(proposal_id);
+      require_app_delegate(reviewer);
+      get_proposals().modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
+          switch (status)
+          {
+          case proposal_t::STATUS_REJECT:
+              eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
+                           proposal.state == proposal_t::STATE_WORK ||
+                           proposal.state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW,
+                           "invalid state");
+
+              proposal.review_votes.downvote(reviewer);
+
+              if (proposal.review_votes.downvotes.size() + 1 >= wintess_count_75)
+              {
+                  refund(proposal);
+                  close(proposal);
+              }
+              break;
+
+          case proposal_t::STATUS_ACCEPT:
+              eosio_assert(proposal_ptr->state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state");
+              proposal.review_votes.downvote(reviewer);
+              if (proposal.review_votes.upvotes.size() >= witness_count_51)
+              {
+                  pay_tspec_author(proposal);
+                  enable_worker_reward(proposal);
+              }
+
+              break;
+
+          default:
+              eosio_assert(false, "invalid review status");
+          }
+      });
+  }
+
+  void withdraw(proposal_id_t proposal_id)
+  {
     auto proposal_ptr = get_proposal(proposal_id);
-    require_app_delegate(reviewer);
+    eosio_assert(proposal_ptr->state == proposal_t::STATE_PAYMENT, "invalid state");
+    require_auth(proposal_ptr->worker);
 
-    get_proposals().modify(proposal_ptr, reviewer, [&](proposal_t &proposal) {
-      switch (status)
-      {
-      case proposal_t::STATUS_REJECT:
-        eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW ||
-                         proposal.state == proposal_t::STATE_WORK ||
-                         proposal.state == proposal_t::STATE_WORK_REVIEW,
-                     "invalid state");
+    asset quantity = proposal_ptr->tspec.development_cost / proposal_ptr->tspec.payments_count;
 
-        proposal.review_votes.downvote(reviewer);
-        if (proposal.review_votes.downvotes.size() >= witness_count_51)
-        {
-          refund(proposal);
-          close(proposal);
+    if (proposal_ptr->worker_payments_count + 1 == proposal_ptr->tspec.payments_count) {
+        quantity += asset(proposal_ptr->tspec.development_cost.amount % proposal_ptr->tspec.payments_count, quantity.symbol);
+    }
+
+    get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](proposal_t &proposal) {
+        proposal.deposit -= quantity;
+        proposal.worker_payments_count += 1;
+
+        if (proposal.worker_payments_count == proposal.tspec.payments_count) {
+            close(proposal);
         }
-        break;
-
-      case proposal_t::STATUS_ACCEPT:
-        eosio_assert(proposal.state == proposal_t::STATE_DELEGATES_REVIEW, "invalid state");
-
-        proposal.review_votes.downvote(reviewer);
-        if (proposal.review_votes.upvotes.size() >= witness_count_51)
-        {
-          pay(proposal, "work payment");
-          close(proposal);
-        }
-        break;
-
-      default:
-        eosio_assert(false, "invalid review status");
-      }
-
-      if (!comment.text.empty())
-      {
-        proposal.comments.add(comment_id, reviewer, comment);
-      }
     });
+
+    action(
+                permission_level{_self, N(active)},
+                TOKEN_ACCOUNT, N(transfer),
+                std::make_tuple(_self, proposal_ptr->worker,
+                                quantity, std::string("worker reward"))
+                ).send();
   }
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
@@ -864,5 +899,5 @@ APP_DOMAIN_ABI(golos::worker, (createpool)\
                (addpropos)(editpropos)(delpropos)(votepropos)\
                (addcomment)(editcomment)(delcomment)\
                (addtspec)(edittspec)(deltspec)(votetspec)(settspec)\
-               (startwork)(finishwork)(acceptwork)(reviewwork)(cancelwork),\
+               (startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork),\
                (transfer))
