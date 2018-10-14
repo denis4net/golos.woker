@@ -713,13 +713,13 @@ public:
         }
         break;
       case voting_module_t::VOTE_DOWN:
-        break;
+          break;
       }
     });
   }
 
   /// @abi action
-  void settspec(proposal_id_t proposal_id, const tspec_data_t &data)
+  void publishtspec(proposal_id_t proposal_id, const tspec_data_t &data)
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
@@ -776,14 +776,16 @@ public:
   }
 
   /// @abi action
-  void acceptwork(proposal_id_t proposal_id, account_name tspec_author)
+  void acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_AUTHOR_REVIEW, "invalid proposal state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+    require_auth(proposal_ptr->tspec_author);
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
       proposal.set_state(proposal_t::STATE_DELEGATES_REVIEW);
+      proposal.work_status.add(comment_id, proposal.tspec_author, comment);
     });
   }
 
@@ -898,6 +900,6 @@ APP_DOMAIN_ABI(golos::worker, (createpool)\
                (addpropos2)\
                (addpropos)(editpropos)(delpropos)(votepropos)\
                (addcomment)(editcomment)(delcomment)\
-               (addtspec)(edittspec)(deltspec)(votetspec)(settspec)\
+               (addtspec)(edittspec)(deltspec)(votetspec)(publishtspec)\
                (startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork),\
                (transfer))
