@@ -79,8 +79,8 @@
         { "name": "tspec_author", "type": "name" },
         { "name": "tspec", "type": "tspec_data_t" },
         { "name": "worker", "type": "name" },
-        { "name": "work_begining_time", "type": "block_timestamp"},
-        { "name": "work_status", "type": "comments_module_t"},
+        { "name": "work_begining_time", "type": "block_timestamp" },
+        { "name": "work_status", "type": "comments_module_t" },
         { "name": "worker_payments_count", "type": "uint8" },
         { "name": "review_votes", "type": "voting_module_t" },
         { "name": "created", "type": "block_timestamp" },
@@ -422,7 +422,7 @@
       ]
     },
     {
-      "name": "transfer",
+      "name": "publishtspec",
       "base": "",
       "fields": [
         {
@@ -430,8 +430,140 @@
           "type": "name"
         },
         {
-          "name": "code",
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "specification",
+          "type": "tspec_data_t"
+        }
+      ]
+    },
+    {
+      "name": "startwork",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
           "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "worker",
+          "type": "name"
+        }
+      ]
+    },
+    {
+      "name": "cancelwork",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "initiaotr",
+          "type": "name"
+        }
+      ]
+    },
+    {
+      "name": "poststatus",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "comment_id",
+          "type": "comment_id_t"
+        },
+        {
+          "name": "comment",
+          "type": "comment_data_t"
+        },
+        {
+          "name": "finished",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "acceptwork",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "comment_id",
+          "type": "comment_id_t"
+        },
+        {
+          "name": "comment",
+          "type": "comment_data_t"
+        }
+      ]
+    },
+    {
+      "name": "reviewwork",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
+        },
+        {
+          "name": "reviewer",
+          "type": "name"
+        },
+        {
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "name": "comment_id",
+          "type": "comment_id_t"
+        },
+        {
+          "name": "comment",
+          "type": "comment_data_t"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "base": "",
+      "fields": [
+        {
+          "name": "app_domain",
+          "type": "name"
+        },
+        {
+          "name": "proposal_id",
+          "type": "proposal_id_t"
         }
       ]
     }
@@ -448,6 +580,16 @@
       "ricardian_contract": ""
     },
     {
+      "name": "addpropos2",
+      "type": "addpropos2",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "setproposfund",
+      "type": "setproposfund",
+      "ricardian_contract": ""
+    },
+    {
       "name": "editpropos",
       "type": "editpropos",
       "ricardian_contract": ""
@@ -458,13 +600,8 @@
       "ricardian_contract": ""
     },
     {
-      "name": "upvote",
-      "type": "upvote",
-      "ricardian_contract": ""
-    },
-    {
-      "name": "downvote",
-      "type": "downvote",
+      "name": "votepropos",
+      "type": "votepropos",
       "ricardian_contract": ""
     },
     {
@@ -498,13 +635,43 @@
       "ricardian_contract": ""
     },
     {
-      "name": "uvotetspec",
-      "type": "uvotetspec",
+      "name": "votetspec",
+      "type": "votetspec",
       "ricardian_contract": ""
     },
     {
-      "name": "transfer",
-      "type": "transfer",
+      "name": "publishtspec",
+      "type": "publishtspec",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "startwork",
+      "type": "startwork",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "cancelwork",
+      "type": "cancelwork",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "poststatus",
+      "type": "poststatus",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "acceptwork",
+      "type": "acceptwork",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "reviewwork",
+      "type": "reviewwork",
+      "ricardian_contract": ""
+    },
+    {
+      "name": "withdraw",
+      "type": "withdraw",
       "ricardian_contract": ""
     }
   ],

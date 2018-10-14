@@ -259,7 +259,7 @@ public:
 
     proposal_id_t id;
     account_name author;
-    type_t type;
+    uint8_t type;
     string title;
     string description;
     account_name fund_name;
@@ -450,11 +450,11 @@ public:
   {
   }
 
-  /// @abi action
   /**
    * @brief createpool creates workers pool in the application domain
    * @param token_symbol application domain name
    */
+  /// @abi action
   void createpool(symbol_name token_symbol)
   {
     LOG("creating worker's pool: code=\"%\" app=\"%\"", name{_self}.to_string().c_str(), name{_app}.to_string().c_str());
@@ -464,7 +464,6 @@ public:
     _state.set(state_t{.token_symbol = token_symbol}, _app);
   }
 
-  /// @abi action
   /**
    * @brief addpropos publishs a new proposal
    * @param proposal_id a proposal ID
@@ -472,6 +471,7 @@ public:
    * @param title proposal title
    * @param description proposal description
    */
+  /// @abi action
   void addpropos(proposal_id_t proposal_id, account_name author, string title, string description)
   {
     require_app_member(author);
@@ -492,7 +492,6 @@ public:
     LOG("added");
   }
 
-  // @abi action
   /**
    * @brief addpropos2 publishs a new proposal for the done work
    * @param proposal_id proposal ID
@@ -502,6 +501,7 @@ public:
    * @param specification proposal technical specification
    * @param worker the party that did work
    */
+  /// @abi action
   void addpropos2(proposal_id_t proposal_id, account_name author,
                   const string &title, const string &description,
                   const tspec_data_t &specification, account_name worker)
@@ -531,13 +531,13 @@ public:
     });
   }
 
-  // @abi action
   /**
    * @brief setproposfund sets a proposal fund
    * @param proposal_id proposal ID
    * @param fund_name the name of the fund: application domain fund (applicatoin domain name) or sponsored fund (account name)
    * @param quantity amount of the tokens that will be deposited
    */
+  /// @abi action
   void setproposfund(proposal_id_t proposal_id, account_name fund_name, asset quantity)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -560,13 +560,13 @@ public:
     });
   }
 
-  // @abi action
   /**
    * @brief editpropos modifies proposal
    * @param proposal_id ID of the modified proposal
    * @param title new title, live empty if no changes are needed
    * @param description a new description, live empty if no changes are required
    */
+  /// @abi action
   void editpropos(proposal_id_t proposal_id, string title, string description)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -593,11 +593,11 @@ public:
     });
   }
 
-  /// @abi action
   /**
   * @brief delpropos deletes proposal
   * @param proposal_id proposal ID to delete
   */
+  /// @abi action
   void delpropos(proposal_id_t proposal_id)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -628,7 +628,6 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief addcomment publish a new comment to the proposal
    * @param proposal_id proposal ID
@@ -636,6 +635,7 @@ public:
    * @param author author of the comment
    * @param data comment data
    */
+  /// @abi action
   void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, account_name author, const comment_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
@@ -647,13 +647,13 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief editcomment modifies existing comment
    * @param proposal_id proposal ID
    * @param comment_id comment ID
    * @param data comment's data, live empty fileds that shouldn't be modified
    */
+  /// @abi action
   void editcomment(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
@@ -664,12 +664,12 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief delcomment deletes comment
    * @param proposal_id proposal ID
    * @param comment_id comment ID to delete
    */
+  /// @abi action
   void delcomment(proposal_id_t proposal_id, comment_id_t comment_id)
   {
     auto proposal = get_proposals().find(proposal_id);
@@ -680,7 +680,6 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief addtspec publish a new technical specification application
    * @param proposal_id proposal ID
@@ -688,6 +687,7 @@ public:
    * @param author author of the technical specification application
    * @param tspec technical specification details
    */
+  /// @abi action
   void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, const tspec_data_t &tspec)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -709,7 +709,6 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief edittspec modifies technical specification application
    * @param proposal_id proposal ID
@@ -717,6 +716,7 @@ public:
    * @param author author of the technical specification
    * @param tspec technical specification details
    */
+  /// @abi action
   void edittspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, const tspec_data_t &tspec)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -737,12 +737,12 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief deltspec deletes technical specification application
    * @param proposal_id proposal ID
    * @param tspec_app_id technical specification application ID
    */
+  /// @abi action
   void deltspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -759,7 +759,6 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief votetspec votes for the technical specification application
    * @param proposal_id proposal ID
@@ -769,6 +768,7 @@ public:
    * @param comment_id comment ID of the comment that will be attached as a description to the vote
    * @param comment attached comment data
    */
+  /// @abi action
   void votetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, uint8_t vote, comment_id_t comment_id, const comment_data_t &comment)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -803,12 +803,12 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief publishtspec publish a final tehcnical specification
    * @param proposal_id proposal ID
    * @param data technical specification details
    */
+  /// @abi action
   void publishtspec(proposal_id_t proposal_id, const tspec_data_t &data)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -826,6 +826,7 @@ public:
    * @param proposal_id proposal ID
    * @param worker worker account name
    */
+  /// @abi action
   void startwork(proposal_id_t proposal_id, account_name worker)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -845,6 +846,7 @@ public:
    * @param proposal_id propsal ID
    * @param initiator a cancel initiator's account name
    */
+  /// @abi action
   void cancelwork(proposal_id_t proposal_id, account_name initiator)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -865,7 +867,6 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief poststatus post status for the work done
    * @param proposal_id proposal ID
@@ -873,6 +874,7 @@ public:
    * @param comment comment data
    * @param finished true if all work done
    */
+  /// @abi action
   void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment, bool finished)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -890,13 +892,13 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief acceptwork accepts a work that was done by the worker. Can be called only by the technical specification author
    * @param proposal_id proposal ID
    * @param comment_id comment ID
    * @param comment
    */
+  /// @abi action
   void acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -910,7 +912,6 @@ public:
     });
   }
 
-  /// @abi action
   /**
    * @brief reviewwork posts delegate's review
    * @param proposal_id proposal ID
@@ -919,6 +920,7 @@ public:
    * @param comment_id comemnt id
    * @param comment comment data, live empty if it isn't required
    */
+  /// @abi action
   void reviewwork(proposal_id_t proposal_id, account_name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment)
   {
     require_app_delegate(reviewer);
@@ -963,6 +965,7 @@ public:
    * @brief withdraw withdraws scheduled payment to the worker account
    * @param proposal_id proposal id
    */
+  /// @abi action
   void withdraw(proposal_id_t proposal_id)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -1000,11 +1003,11 @@ public:
   }
 
   // https://tbfleming.github.io/cib/eos.html#gist=d230f3ab2998e8858d3e51af7e4d9aeb
-  /// @abi action
   static void transfer(currency::transfer &t)
   {
     print_f("%: transfer % from \"%\" to \"%\"", __FUNCTION__, t.quantity.amount, name{t.from}.to_string().c_str(), name{t.to}.to_string().c_str());
 
+    //TODO: do security check
     worker self(current_receiver(), eosio::string_to_name(t.memo.c_str()));
     if (t.to != self._self || t.quantity.symbol == self.get_state().token_symbol)
     {
