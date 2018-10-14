@@ -452,6 +452,10 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief createpool creates workers pool in the application domain
+   * @param token_symbol application domain name
+   */
   void createpool(symbol_name token_symbol)
   {
     LOG("creating worker's pool: code=\"%\" app=\"%\"", name{_self}.to_string().c_str(), name{_app}.to_string().c_str());
@@ -462,6 +466,13 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief addpropos publishs a new proposal
+   * @param proposal_id a proposal ID
+   * @param author author of the new proposal
+   * @param title proposal title
+   * @param description proposal description
+   */
   void addpropos(proposal_id_t proposal_id, account_name author, string title, string description)
   {
     require_app_member(author);
@@ -482,6 +493,16 @@ public:
     LOG("added");
   }
 
+  // @abi action
+  /**
+   * @brief addpropos2 publishs a new proposal for the done work
+   * @param proposal_id proposal ID
+   * @param author author of the proposal
+   * @param title proposal title
+   * @param description proposal description
+   * @param specification proposal technical specification
+   * @param worker the party that did work
+   */
   void addpropos2(proposal_id_t proposal_id, account_name author,
                   const string& title, const string& description,
                   const tspec_data_t &specification, account_name worker)
@@ -513,6 +534,13 @@ public:
       });
   }
 
+  // @abi action
+  /**
+   * @brief setproposfund sets a proposal fund
+   * @param proposal_id proposal ID
+   * @param fund_name the name of the fund: application domain fund (applicatoin domain name) or sponsored fund (account name)
+   * @param quantity amount of the tokens that will be deposited
+   */
   void setproposfund(proposal_id_t proposal_id, account_name fund_name, asset quantity)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -536,6 +564,12 @@ public:
   }
 
   // @abi action
+  /**
+   * @brief editpropos modifies proposal
+   * @param proposal_id ID of the modified proposal
+   * @param title new title, live empty if no changes are needed
+   * @param description a new description, live empty if no changes are required
+   */
   void editpropos(proposal_id_t proposal_id, string title, string description)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -563,6 +597,10 @@ public:
   }
 
   /// @abi action
+  /**
+  * @brief delpropos deletes proposal
+  * @param proposal_id proposal ID to delete
+  */
   void delpropos(proposal_id_t proposal_id)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -574,6 +612,13 @@ public:
     get_proposals().erase(proposal_ptr);
   }
 
+
+  /**
+   * @brief votepropos places a vote for the proposal
+   * @param proposal_id proposal ID
+   * @param author name of the voting account
+   * @param vote 1 for positive vote, 0 for negative vote. Look at the voting_module_t::vote_t
+   */
   /// @abi action
   void votepropos(proposal_id_t proposal_id, account_name author, uint8_t vote)
   {
@@ -588,6 +633,13 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief addcomment publish a new comment to the proposal
+   * @param proposal_id proposal ID
+   * @param comment_id comment ID
+   * @param author author of the comment
+   * @param data comment data
+   */
   void addcomment(proposal_id_t proposal_id, comment_id_t comment_id, account_name author, const comment_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
@@ -600,6 +652,12 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief editcomment modifies existing comment
+   * @param proposal_id proposal ID
+   * @param comment_id comment ID
+   * @param data comment's data, live empty fileds that shouldn't be modified
+   */
   void editcomment(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &data)
   {
     auto proposal = get_proposals().find(proposal_id);
@@ -611,6 +669,11 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief delcomment deletes comment
+   * @param proposal_id proposal ID
+   * @param comment_id comment ID to delete
+   */
   void delcomment(proposal_id_t proposal_id, comment_id_t comment_id)
   {
     auto proposal = get_proposals().find(proposal_id);
@@ -622,6 +685,13 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief addtspec publish a new technical specification application
+   * @param proposal_id proposal ID
+   * @param tspec_id technical speification aplication ID
+   * @param author author of the technical specification application
+   * @param tspec technical specification details
+   */
   void addtspec(proposal_id_t proposal_id, tspec_id_t tspec_id, account_name author, const tspec_data_t &tspec)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -645,7 +715,14 @@ public:
   }
 
   /// @abi action
-  void edittspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, const tspec_data_t &that)
+  /**
+   * @brief edittspec modifies technical specification application
+   * @param proposal_id proposal ID
+   * @param tspec_app_id technical specification application ID
+   * @param author author of the technical specification
+   * @param tspec technical specification details
+   */
+  void edittspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, const tspec_data_t &tspec)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
     eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
@@ -654,18 +731,23 @@ public:
 
     const auto tspec = get_tspec(*proposal_ptr, tspec_app_id);
     eosio_assert(tspec != proposal_ptr->tspec_apps.end(), "technical specification doesn't exist");
-    eosio_assert(that.specification_cost.symbol == get_state().token_symbol, "invalid token symbol");
-    eosio_assert(that.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
+    eosio_assert(tspec.specification_cost.symbol == get_state().token_symbol, "invalid token symbol");
+    eosio_assert(tspec.development_cost.symbol == get_state().token_symbol, "invalid token symbol");
 
     require_app_member(tspec->author);
 
     get_proposals().modify(proposal_ptr, tspec->author, [&](auto &o) {
       auto tspec = get_tspec(o, tspec_app_id);
-      tspec->modify(that);
+      tspec->modify(tspec);
     });
   }
 
   /// @abi action
+  /**
+   * @brief deltspec deletes technical specification application
+   * @param proposal_id proposal ID
+   * @param tspec_app_id technical specification application ID
+   */
   void deltspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
@@ -683,15 +765,23 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief votetspec votes for the technical specification application
+   * @param proposal_id proposal ID
+   * @param tspec_app_id technical specification application
+   * @param author voting account name
+   * @param vote 1 - for the positive vote, 0 - for the negative vote. Look at a voting_module_t::vote_t
+   * @param comment_id comment ID of the comment that will be attached as a description to the vote
+   * @param comment attached comment data
+   */
   void votetspec(proposal_id_t proposal_id, tspec_id_t tspec_app_id, account_name author, uint8_t vote, comment_id_t comment_id, const comment_data_t &comment)
   {
-    auto proposal_ptr = get_proposals().find(proposal_id);
-    eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
+    auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_APP, "invalid state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
 
     const auto tspec_ptr = get_tspec(*proposal_ptr, tspec_app_id);
-    eosio_assert(tspec_ptr != proposal_ptr->tspec_apps.end(), "technical specification doesn't exist");
+    eosio_assert(tspec_ptr != proposal_ptr->tspec_apps.end(), "technical specification applicatoin doesn't exist");
     require_app_delegate(author);
     eosio_assert(voting_time_s + tspec_ptr->created.to_time_point().sec_since_epoch() <= now(), "voting time is over");
 
@@ -719,23 +809,34 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief publishtspec publish a final tehcnical specification
+   * @param proposal_id proposal ID
+   * @param data technical specification details
+   */
   void publishtspec(proposal_id_t proposal_id, const tspec_data_t &data)
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+    require_auth(proposal_ptr->tspec_author);
 
     get_proposals().modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
       proposal.tspec.update(data);
-      proposal.set_state(proposal_t::STATE_WORK);
     });
   }
 
+  /**
+   * @brief startwork chooses worker account and allows the worker to start work on the proposal
+   * @param proposal_id proposal ID
+   * @param worker worker account name
+   */
   void startwork(proposal_id_t proposal_id, account_name worker)
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_TSPEC_CREATE, "invalid proposal state");
     eosio_assert(proposal_ptr->type == proposal_t::TYPE_1, "unsupported action");
+    require_auth(proposal_ptr->tspec_author);
 
     get_proposals().modify(proposal_ptr, proposal_ptr->tspec_author, [&](proposal_t &proposal) {
       proposal.worker = worker;
@@ -744,6 +845,11 @@ public:
     });
   }
 
+  /**
+   * @brief cancelwork cancels work. Can be called by the worker or technical specification author
+   * @param proposal_id propsal ID
+   * @param initiator a cancel initiator's account name
+   */
   void cancelwork(proposal_id_t proposal_id, account_name initiator) {
       auto proposal_ptr = get_proposal(proposal_id);
       eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
@@ -760,7 +866,15 @@ public:
       });
   }
 
-  void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t comment, bool finished)
+  /// @abi action
+  /**
+   * @brief poststatus post status for the work done
+   * @param proposal_id proposal ID
+   * @param comment_id comment ID
+   * @param comment comment data
+   * @param finished true if all work done
+   */
+  void poststatus(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment, bool finished)
   {
     auto proposal_ptr = get_proposal(proposal_id);
     eosio_assert(proposal_ptr->state == proposal_t::STATE_WORK, "invalid proposal state");
@@ -768,6 +882,7 @@ public:
     require_auth(proposal_ptr->worker);
 
     get_proposals().modify(proposal_ptr, proposal_ptr->worker, [&](auto &proposal) {
+        proposal.work_status.add(comment_id, proposal.worker, comment);
 
         if (finished) {
             proposal.set_state(proposal_t::STATE_TSPEC_AUTHOR_REVIEW);
@@ -776,6 +891,12 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief acceptwork accepts a work that was done by the worker. Can be called only by the technical specification author
+   * @param proposal_id proposal ID
+   * @param comment_id comment ID
+   * @param comment
+   */
   void acceptwork(proposal_id_t proposal_id, comment_id_t comment_id, const comment_data_t &comment)
   {
     auto proposal_ptr = get_proposal(proposal_id);
@@ -790,6 +911,14 @@ public:
   }
 
   /// @abi action
+  /**
+   * @brief reviewwork posts delegate's review
+   * @param proposal_id proposal ID
+   * @param reviewer delegate's account name
+   * @param status 0 - reject, 1 - approve. Look at the proposal_t::review_status_t
+   * @param comment_id comemnt id
+   * @param comment comment data, live empty if it isn't required
+   */
   void reviewwork(proposal_id_t proposal_id, account_name reviewer, uint8_t status, comment_id_t comment_id, const comment_data_t &comment)
   {
       require_app_delegate(reviewer);
@@ -830,6 +959,10 @@ public:
       });
   }
 
+  /**
+   * @brief withdraw withdraws scheduled payment to the worker account
+   * @param proposal_id proposal id
+   */
   void withdraw(proposal_id_t proposal_id)
   {
     auto proposal_ptr = get_proposal(proposal_id);
