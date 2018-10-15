@@ -14,9 +14,10 @@ it(
     const appName = "app.sample"
     const tokenSymbol = "APP"
 
+    await eosTest.newAccount("user1", "delegate1", "delegate2", "golos.worker", "golos.token", appName)
+
     console.log("build & deploy token contract")
     await eosTest.make("contracts/golos.token")
-    await eosTest.newAccount("golos.token")
     const tokenContract = await eosTest.deploy(
       "golos.token",
       "contracts/golos.token/golos.token.wasm",
@@ -25,19 +26,6 @@ it(
 
     console.log("build contract")
     await eosTest.make("contracts/golos.worker")
-
-    console.log("create test account")
-    await eosTest.newAccount("user1")
-
-    console.log("create a delgate's accounts")
-    await eosTest.newAccount("delegate1")
-    await eosTest.newAccount("delegate2")
-
-    console.log("create a golos.worker account")
-    await eosTest.newAccount("golos.worker")
-
-    console.log("create an app.sample account")
-    await eosTest.newAccount(appName)
 
     console.log("create app token")
     await tokenContract.create(appName, `1000000000 ${tokenSymbol}`, {
@@ -51,15 +39,11 @@ it(
     const contract = await eosTest.deploy(
       "golos.worker",
       "contracts/golos.worker/golos.worker.wasm",
-      "contracts/golos.worker/golos.worker.abi.json"
+      "contracts/golos.worker/golos.worker.abi"
     )
 
     console.log("create")
     await contract.createpool(appName, tokenSymbol, { authorization: appName })
-    console.log(
-      "states table:",
-      await eosTest.eos.getTableRows(true, "golos.worker", appName, "states")
-    )
 
     console.log("Workers pool replenishment")
     await tokenContract.transfer(

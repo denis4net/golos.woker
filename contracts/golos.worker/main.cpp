@@ -532,13 +532,13 @@ public:
   }
 
   /**
-   * @brief setproposfund sets a proposal fund
+   * @brief setfund sets a proposal fund
    * @param proposal_id proposal ID
    * @param fund_name the name of the fund: application domain fund (applicatoin domain name) or sponsored fund (account name)
    * @param quantity amount of the tokens that will be deposited
    */
   /// @abi action
-  void setproposfund(proposal_id_t proposal_id, account_name fund_name, asset quantity)
+  void setfund(proposal_id_t proposal_id, account_name fund_name, asset quantity)
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
     eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
@@ -699,12 +699,13 @@ public:
                  "technical specification is already exists with the same id");
 
     get_proposals().modify(proposal_ptr, author, [&](auto &o) {
-      tspec_app_t spec = {
-          .id = tspec_id,
-          .author = author,
-          .created = TIMESTAMP_NOW,
-          .modified = TIMESTAMP_UNDEFINED,
-          .data = tspec};
+      tspec_app_t spec;
+      spec.id = tspec_id;
+      spec.author = author;
+      spec.created = TIMESTAMP_NOW;
+      spec.modified = TIMESTAMP_UNDEFINED;
+      spec.data = tspec;
+
       o.tspec_apps.push_back(spec);
     });
   }
@@ -1039,5 +1040,5 @@ public:
 };
 } // namespace golos
 
-APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(votetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork),
+APP_DOMAIN_ABI(golos::worker, (createpool)(addpropos2)(addpropos)(setfund)(editpropos)(delpropos)(votepropos)(addcomment)(editcomment)(delcomment)(addtspec)(edittspec)(deltspec)(votetspec)(publishtspec)(startwork)(poststatus)(acceptwork)(reviewwork)(cancelwork)(withdraw),
                (transfer))
