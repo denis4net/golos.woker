@@ -620,7 +620,7 @@ public:
   {
     auto proposal_ptr = get_proposals().find(proposal_id);
     eosio_assert(proposal_ptr != get_proposals().end(), "proposal has not been found");
-    eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() <= now(), "voting time is over");
+    eosio_assert(voting_time_s + proposal_ptr->created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
     require_app_member(author);
 
     get_proposals().modify(proposal_ptr, author, [&](auto &o) {
@@ -779,7 +779,7 @@ public:
     const auto tspec_ptr = get_tspec(*proposal_ptr, tspec_app_id);
     eosio_assert(tspec_ptr != proposal_ptr->tspec_apps.end(), "technical specification applicatoin doesn't exist");
     require_app_delegate(author);
-    eosio_assert(voting_time_s + tspec_ptr->created.to_time_point().sec_since_epoch() <= now(), "voting time is over");
+    eosio_assert(voting_time_s + tspec_ptr->created.to_time_point().sec_since_epoch() >= now(), "voting time is over");
 
     get_proposals().modify(proposal_ptr, tspec_ptr->author, [&](auto &o) {
       auto tspec = get_tspec(o, tspec_app_id);

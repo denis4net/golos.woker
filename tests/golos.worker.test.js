@@ -58,7 +58,7 @@ it(
       `500 ${tokenSymbol}`,
       appName /* memo */
     )
-    let funds = await eosTest.eos.getTableRows(
+    let funds = await eosTest.api.getTableRows(
       true,
       "golos.worker",
       appName,
@@ -123,10 +123,10 @@ it(
         proposal.text,
         { authorization: proposal.user }
       )
-      await contract.upvote(appName, proposal.id, "delegate1", {
+      await contract.votepropos(appName, proposal.id, "delegate1", 1, {
         authorization: "delegate1"
       })
-      await contract.downvote(appName, proposal.id, "delegate2", {
+      await contract.votepropos(appName, proposal.id, "delegate2", 0, {
         authorization: "delegate2"
       })
 
@@ -159,7 +159,7 @@ it(
 
     console.log(
       "proposals table",
-      await eosTest.eos.getTableRows(true, "golos.worker", appName, "proposals")
+      await eosTest.api.getTableRows(true, "golos.worker", appName, "proposals")
     )
 
     // for (let proposal of proposals) {
@@ -171,7 +171,13 @@ it(
     //   await contract.delpropos(appName, proposal.id, {authorization: proposal.user})
     // }
 
+    eosTest.destroy()
     done()
   },
   300000
 )
+
+afterAll(async done => {
+  await eosTest.destroy()
+  done()
+})
