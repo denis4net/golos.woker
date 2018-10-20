@@ -29,15 +29,15 @@ beforeAll(async done => {
   );
 
   console.log("build & deploy token contract");
-  await eosTest.make("contracts/golos.token");
+  await eosTest.make("../golos.token");
   tokenContract = await eosTest.deploy(
     "golos.token",
-    "contracts/golos.token/golos.token.wasm",
-    "contracts/golos.token/golos.token.abi"
+    "../golos.token/golos.token.wasm",
+    "../golos.token/golos.token.abi"
   );
 
   console.log("build contract");
-  await eosTest.make("contracts/golos.worker");
+  await eosTest.make(".");
 
   console.log("create app token");
   await tokenContract.create(appName, `1000000000 ${tokenSymbol}`, {
@@ -50,8 +50,8 @@ beforeAll(async done => {
   console.log("deploy golos.worker contract");
   contract = await eosTest.deploy(
     "golos.worker",
-    "contracts/golos.worker/golos.worker.wasm",
-    "contracts/golos.worker/golos.worker.abi"
+    "golos.worker.wasm",
+    "golos.worker.abi"
   );
 
   done();
