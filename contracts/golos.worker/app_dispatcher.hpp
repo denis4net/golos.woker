@@ -65,7 +65,7 @@ bool execute_app_action(uint64_t receiver, uint64_t code, void (Q::*func)(Args..
 
 
 template <typename... Args>
-bool execute_action(uint64_t receiver, uint64_t code, void (*func)(Args...))
+bool execute_action(uint64_t receiver, uint64_t code, void (*func)(uint64_t, Args...))
 {
     size_t size = action_data_size();
     //using malloc/free here potentially is not exception-safe, although WASM doesn't support exceptions
@@ -85,7 +85,7 @@ bool execute_action(uint64_t receiver, uint64_t code, void (*func)(Args...))
     }
 
     auto f2 = [&](auto... a) {
-        (func)(a...);
+        (func)(code, a...);
     };
 
     boost::mp11::tuple_apply(f2, args);
